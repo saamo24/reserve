@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import DbSession, RedisDep
+from app.api.deps import CurrentAdmin, DbSession, RedisDep
 from app.models.table import Table
 from app.repositories.table_repository import TableRepository
 from app.schemas.common import PaginatedResponse, PaginationMeta
@@ -17,6 +17,7 @@ router = APIRouter(prefix="/tables", tags=["admin-tables"])
 
 @router.get("", response_model=PaginatedResponse[TableResponse])
 async def list_tables(
+    admin: CurrentAdmin,
     db: DbSession,
     branch_id: UUID | None = Query(None, description="Filter by branch"),
     page: int = 1,
@@ -45,6 +46,7 @@ async def list_tables(
 @router.post("", response_model=TableResponse, status_code=201)
 async def create_table(
     body: TableCreate,
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
 ) -> TableResponse:
@@ -72,6 +74,7 @@ async def create_table(
 async def update_table(
     table_id: UUID,
     body: TableUpdate,
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
 ) -> TableResponse:
@@ -96,6 +99,7 @@ async def update_table(
 @router.delete("/{table_id}", status_code=204)
 async def delete_table(
     table_id: UUID,
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
 ) -> None:

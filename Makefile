@@ -208,7 +208,6 @@ python-shell:
 ## Populate database with initial data (builds api image first so code/deps are current)
 populate:
 	@echo "Populating database..."
-	@$(COMPOSE) -f $(COMPOSE_FILE) build $(API_SERVICE)
 	@$(COMPOSE) -f $(COMPOSE_FILE) run --rm $(API_SERVICE) python $(POPULATE_SCRIPT)
 
 # ============================================================================

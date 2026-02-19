@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.api.deps import DbSession, RedisDep
+from app.api.deps import CurrentAdmin, DbSession, RedisDep
 from app.models.reservation import ReservationStatus
 from app.repositories.reservation_repository import ReservationRepository
 from app.schemas.common import PaginatedResponse, PaginationMeta
@@ -32,6 +32,7 @@ def _reservation_service(db: DbSession, redis: RedisDep) -> ReservationService:
 
 @router.get("", response_model=PaginatedResponse[ReservationResponse])
 async def list_reservations(
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
     branch_id: UUID | None = Query(None),
@@ -66,6 +67,7 @@ async def list_reservations(
 async def update_reservation(
     reservation_id: UUID,
     body: ReservationUpdate,
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
 ) -> ReservationResponse:

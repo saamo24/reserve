@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import DbSession
+from app.api.deps import CurrentAdmin, DbSession
 from app.models.reservation import Reservation, ReservationStatus
 from sqlalchemy import func, select
 
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/dashboard", tags=["admin-dashboard"])
 
 @router.get("/stats")
 async def get_dashboard_stats(
+    admin: CurrentAdmin,
     db: DbSession,
     branch_id: UUID | None = Query(None),
     from_date: date | None = Query(None, alias="from_date"),

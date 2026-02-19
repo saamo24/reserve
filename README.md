@@ -131,7 +131,7 @@ curl -s http://localhost:8000/admin/dashboard/stats \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-**First admin:** Run `make seed` (or `python scripts/seed.py`) after migrations to create a default admin user (username: `admin`, password: `admin`). Change the password in production.
+**First admin:** Run `make seed` (or `python scripts/seed.py`) after migrations to create a default admin user (email: `admin@example.com`, password: `admin123` by default, configurable via `ADMIN_EMAIL` and `ADMIN_TEMP_PASSWORD` env vars). Change the password in production.
 
 ## Response Format
 

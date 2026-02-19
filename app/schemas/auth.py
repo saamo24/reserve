@@ -1,12 +1,12 @@
 """Auth request/response schemas."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
     """Login request body."""
 
-    username: str = Field(..., min_length=1, description="Admin username")
+    email: EmailStr = Field(..., min_length=1, description="Admin email")
     password: str = Field(..., min_length=1, description="Admin password")
 
 

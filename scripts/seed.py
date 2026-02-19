@@ -25,16 +25,16 @@ async def main() -> None:
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        # Idempotent: create default admin if missing (dev: admin / admin)
-        admin_result = await session.execute(select(Admin).where(Admin.username == "admin"))
+        # Idempotent: create default admin if missing
+        admin_result = await session.execute(select(Admin).where(Admin.email == settings.admin_email))
         if admin_result.scalar_one_or_none() is None:
             admin = Admin(
-                username="admin",
-                hashed_password=hash_password("admin"),
+                email=settings.admin_email,
+                hashed_password=hash_password(settings.admin_temp_password),
             )
             session.add(admin)
             await session.flush()
-            print("Created default admin user (username: admin, password: admin). Change in production.")
+            print(f"Created default admin user (email: {settings.admin_email}, password: {settings.admin_temp_password}). Change in production.")
 
         # Idempotent: skip if branch already exists
         result = await session.execute(select(Branch).where(Branch.name == "Main Branch"))

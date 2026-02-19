@@ -19,13 +19,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: DbSession) -> TokenResponse:
-    """Authenticate with username/password; returns access and refresh tokens."""
+    """Authenticate with email/password; returns access and refresh tokens."""
     repo = AdminRepository(db)
-    admin = await repo.get_by_username(body.username)
+    admin = await repo.get_by_email(body.email)
     if admin is None or not verify_password(body.password, admin.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = create_access_token(admin.id)

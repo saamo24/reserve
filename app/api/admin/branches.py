@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import DbSession, RedisDep
+from app.api.deps import CurrentAdmin, DbSession, RedisDep
 from app.repositories.branch_repository import BranchRepository
 from app.schemas.branch import BranchCreate, BranchResponse, BranchUpdate
 from app.schemas.common import PaginatedResponse, PaginationMeta
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/branches", tags=["admin-branches"])
 
 @router.get("", response_model=PaginatedResponse[BranchResponse])
 async def list_branches(
+    admin: CurrentAdmin,
     db: DbSession,
     page: int = 1,
     page_size: int = 20,
@@ -35,7 +36,11 @@ async def list_branches(
 
 
 @router.post("", response_model=BranchResponse, status_code=201)
-async def create_branch(body: BranchCreate, db: DbSession) -> BranchResponse:
+async def create_branch(
+    body: BranchCreate,
+    admin: CurrentAdmin,
+    db: DbSession,
+) -> BranchResponse:
     """Create a branch."""
     repo = BranchRepository(db)
     branch = Branch(
@@ -56,6 +61,7 @@ async def create_branch(body: BranchCreate, db: DbSession) -> BranchResponse:
 async def update_branch(
     branch_id: UUID,
     body: BranchUpdate,
+    admin: CurrentAdmin,
     db: DbSession,
     redis: RedisDep,
 ) -> BranchResponse:

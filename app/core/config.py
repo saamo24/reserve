@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +52,10 @@ class Settings(BaseSettings):
 
     # Lock TTL (seconds)
     lock_ttl_seconds: int = Field(default=10, ge=1, alias="LOCK_TTL_SECONDS")
+
+    # Admin
+    admin_email: str = Field(default="admin@example.com", alias="ADMIN_EMAIL")
+    admin_temp_password: str = Field(default="admin123", alias="ADMIN_TEMP_PASSWORD")
 
 
 @lru_cache
