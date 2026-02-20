@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import DbSession, RedisDep
 from app.schemas.reservation import ReservationCreate, ReservationResponse
@@ -61,3 +61,39 @@ async def get_reservation(
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
     return reservation
+
+
+@router.get("/{reservation_id}/confirm", response_model=ReservationResponse)
+async def confirm_reservation(
+    reservation_id: UUID,
+    db: DbSession,
+    redis: RedisDep,
+    token: str = Query(..., description="Confirmation token from email"),
+) -> ReservationResponse:
+    """Confirm a reservation via email confirmation link."""
+    service = _reservation_service(db, redis)
+    try:
+        reservation = await service.confirm_reservation(reservation_id, token)
+        if reservation is None:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        return reservation
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{reservation_id}/cancel", response_model=ReservationResponse)
+async def cancel_reservation(
+    reservation_id: UUID,
+    db: DbSession,
+    redis: RedisDep,
+    token: str = Query(..., description="Cancellation token from email"),
+) -> ReservationResponse:
+    """Cancel a reservation via email cancellation link."""
+    service = _reservation_service(db, redis)
+    try:
+        reservation = await service.cancel_reservation(reservation_id, token)
+        if reservation is None:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        return reservation
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -14,6 +14,7 @@ from app.repositories.reservation_repository import ReservationRepository
 from app.repositories.table_repository import TableRepository
 from app.schemas.reservation import ReservationCreate, ReservationUpdate
 from app.services.caching_service import CachingService
+from app.services.email_service import EmailService
 from app.services.locking_service import LockingService
 from app.services.timeslot_service import TimeslotService
 from app.utils.validators import get_now_in_timezone, time_in_range
@@ -95,6 +96,11 @@ class ReservationService:
             if overlap:
                 raise ConflictError("This slot was just taken")
 
+            # Set status: PENDING if email provided, CONFIRMED otherwise
+            initial_status = (
+                ReservationStatus.PENDING if body.email else ReservationStatus.CONFIRMED
+            )
+
             reservation = Reservation(
                 branch_id=body.branch_id,
                 table_id=table_id,
@@ -104,7 +110,7 @@ class ReservationService:
                 reservation_date=body.reservation_date,
                 start_time=body.start_time,
                 end_time=end_time,
-                status=ReservationStatus.CONFIRMED,
+                status=initial_status,
                 notes=body.notes,
             )
             await self._reservation_repo.create(reservation)
@@ -114,7 +120,26 @@ class ReservationService:
             await self._caching.invalidate_slots(body.branch_id, body.reservation_date)
             await self._caching.invalidate_tables(body.branch_id)
 
-            return reservation
+            # Reload reservation with relations for email sending
+            reservation_with_relations = await self._reservation_repo.get_by_id(
+                reservation.id, load_branch=True, load_table=True
+            )
+            if reservation_with_relations is None:
+                reservation_with_relations = reservation
+
+            # Send emails (non-blocking, errors logged but don't fail reservation)
+            email_service = EmailService()
+            try:
+                # Send confirmation email to user if email provided
+                if body.email:
+                    await email_service.send_reservation_confirmation(reservation_with_relations)
+                # Always send admin notification
+                await email_service.send_admin_notification(reservation_with_relations)
+            except Exception:
+                # Log but don't fail - email is not critical for reservation creation
+                pass
+
+            return reservation_with_relations
         except IntegrityError:
             await self._session.rollback()
             raise ConflictError("This slot was just taken or duplicate reservation")
@@ -145,9 +170,83 @@ class ReservationService:
                 return table.id
         return None
 
-    async def get_by_id(self, id: UUID) -> Reservation | None:
+    async def get_by_id(self, id: UUID, load_relations: bool = True) -> Reservation | None:
         """Get reservation by id (with branch and table loaded)."""
-        return await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
+        return await self._reservation_repo.get_by_id(
+            id, load_branch=load_relations, load_table=load_relations
+        )
+
+    async def confirm_reservation(self, id: UUID, token: str) -> Reservation | None:
+        """Confirm a reservation via email token."""
+        from app.utils.tokens import verify_reservation_token
+
+        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
+        if reservation is None:
+            return None
+
+        # Verify token
+        verified_id = verify_reservation_token(token, "confirm")
+        if verified_id != id:
+            raise ValueError("Invalid or expired confirmation token")
+
+        # Only allow confirmation if status is PENDING
+        if reservation.status != ReservationStatus.PENDING:
+            raise ValueError(f"Cannot confirm reservation with status {reservation.status.value}")
+
+        # Update status
+        old_status = reservation.status
+        reservation.status = ReservationStatus.CONFIRMED
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+
+        # Invalidate cache
+        await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
+        await self._caching.invalidate_tables(reservation.branch_id)
+
+        # Send status update email
+        email_service = EmailService()
+        try:
+            await email_service.send_reservation_status_update(reservation, old_status)
+        except Exception:
+            pass
+
+        return reservation
+
+    async def cancel_reservation(self, id: UUID, token: str) -> Reservation | None:
+        """Cancel a reservation via email token."""
+        from app.utils.tokens import verify_reservation_token
+
+        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
+        if reservation is None:
+            return None
+
+        # Verify token
+        verified_id = verify_reservation_token(token, "cancel")
+        if verified_id != id:
+            raise ValueError("Invalid or expired cancellation token")
+
+        # Only allow cancellation if status is PENDING
+        if reservation.status != ReservationStatus.PENDING:
+            raise ValueError(f"Cannot cancel reservation with status {reservation.status.value}")
+
+        # Update status
+        old_status = reservation.status
+        reservation.status = ReservationStatus.CANCELLED
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+
+        # Invalidate cache
+        await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
+        await self._caching.invalidate_tables(reservation.branch_id)
+
+        # Send status update email
+        email_service = EmailService()
+        try:
+            await email_service.send_reservation_status_update(reservation, old_status)
+        except Exception:
+            pass
+
+        return reservation
 
     async def list_with_filters(
         self,
@@ -175,9 +274,12 @@ class ReservationService:
 
     async def update(self, id: UUID, body: ReservationUpdate) -> Reservation | None:
         """Update reservation status/notes (admin). Invalidates cache if status/date/table changed."""
-        reservation = await self._reservation_repo.get_by_id(id)
+        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
         if reservation is None:
             return None
+
+        # Track old status for email notification
+        old_status = reservation.status
 
         if body.status is not None:
             reservation.status = body.status
@@ -189,6 +291,16 @@ class ReservationService:
 
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
+
+        # Send status update email if status changed
+        if body.status is not None and body.status != old_status:
+            email_service = EmailService()
+            try:
+                await email_service.send_reservation_status_update(reservation, old_status)
+            except Exception:
+                # Log but don't fail - email is not critical
+                pass
+
         return reservation
 
 

@@ -54,8 +54,17 @@ class Settings(BaseSettings):
     lock_ttl_seconds: int = Field(default=10, ge=1, alias="LOCK_TTL_SECONDS")
 
     # Admin
-    admin_email: str = Field(default="admin@example.com", alias="ADMIN_EMAIL")
+    admin_email: str = Field(default="reserve_admin_samo@yopmail.com", alias="ADMIN_EMAIL")
     admin_temp_password: str = Field(default="admin123", alias="ADMIN_TEMP_PASSWORD")
+
+    # Email/SMTP
+    smtp_host: str = Field(default="", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: str = Field(default="", alias="SMTP_USERNAME")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD") # 
+    smtp_from_email: str = Field(default="noreply@example.com", alias="SMTP_FROM_EMAIL")
+    smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
+    app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
 
 
 @lru_cache
