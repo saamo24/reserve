@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Reservation Status Update</title>
+    <title>Admin Reservation Status Update</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f2f4f8;font-family:Arial,Helvetica,sans-serif;">
 
@@ -17,38 +17,29 @@
                     <tr>
                         <td align="center" style="padding-bottom:15px;">
                             <h2 style="margin:0;color:#1f2937;font-size:22px;">
-                                📢 Reservation Status Update
+                                🛠 Reservation Status Updated
                             </h2>
                             <p style="color:#6b7280;font-size:14px;margin-top:8px;">
-                                Hello {{ reservation.full_name }},
+                                A reservation status has been changed in the system.
                             </p>
                         </td>
                     </tr>
 
-                    <!-- Status Message + Badge -->
+                    <!-- Status Badge -->
                     <tr>
                         <td align="center" style="padding-bottom:20px;">
 
                             {% if status.value == 'CONFIRMED' %}
-                                <p style="margin:0 0 10px 0;color:#374151;">
-                                    Great news! Your reservation has been confirmed.
-                                </p>
                                 <span style="background:#d1fae5;color:#065f46;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:bold;">
                                     ✅ CONFIRMED
                                 </span>
 
                             {% elif status.value == 'CANCELLED' %}
-                                <p style="margin:0 0 10px 0;color:#374151;">
-                                    Your reservation has been cancelled.
-                                </p>
                                 <span style="background:#fee2e2;color:#991b1b;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:bold;">
                                     ❌ CANCELLED
                                 </span>
 
                             {% elif status.value == 'COMPLETED' %}
-                                <p style="margin:0 0 10px 0;color:#374151;">
-                                    Your reservation has been marked as completed.
-                                </p>
                                 <span style="background:#e0f2fe;color:#075985;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:bold;">
                                     🎉 COMPLETED
                                 </span>
@@ -62,6 +53,15 @@
                         <td style="background:#f9fafb;border-radius:8px;padding:20px;">
 
                             <p style="margin:8px 0;"><strong>Reservation ID:</strong> {{ reservation.id }}</p>
+                            <p style="margin:8px 0;"><strong>Customer:</strong> {{ reservation.full_name }}</p>
+                            <p style="margin:8px 0;"><strong>Phone:</strong> {{ reservation.phone_number }}</p>
+
+                            {% if reservation.email %}
+                            <p style="margin:8px 0;"><strong>Email:</strong> {{ reservation.email }}</p>
+                            {% endif %}
+
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:15px 0;">
+
                             <p style="margin:8px 0;"><strong>Branch:</strong> {{ reservation.branch.name }}</p>
                             <p style="margin:8px 0;"><strong>Address:</strong> {{ reservation.branch.address }}</p>
                             <p style="margin:8px 0;"><strong>Table:</strong> {{ reservation.table.table_number }}</p>
@@ -75,29 +75,26 @@
                             <p style="margin:8px 0;"><strong>Notes:</strong> {{ reservation.notes }}</p>
                             {% endif %}
 
+                            <p style="margin:8px 0;font-size:12px;color:#6b7280;">
+                                Created at {{ reservation.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                            </p>
+
+                            {% if updated_by %}
+                            <p style="margin:8px 0;font-size:12px;color:#6b7280;">
+                                Updated by: {{ updated_by }}
+                            </p>
+                            {% endif %}
+
                         </td>
                     </tr>
 
-                    <!-- Bottom Message -->
+                    <!-- Admin Action Button -->
                     <tr>
-                        <td style="padding-top:20px;font-size:14px;color:#374151;">
-
-                            {% if status.value == 'CONFIRMED' %}
-                                <p style="margin:0;">
-                                    We look forward to serving you! If you need to make changes, please contact us.
-                                </p>
-
-                            {% elif status.value == 'CANCELLED' %}
-                                <p style="margin:0;">
-                                    If you have questions about this cancellation, feel free to contact us.
-                                </p>
-
-                            {% elif status.value == 'COMPLETED' %}
-                                <p style="margin:0;">
-                                    Thank you for dining with us! We hope you had a wonderful experience.
-                                </p>
-                            {% endif %}
-
+                        <td align="center" style="padding-top:25px;">
+                            <a href="{{ app_base_url }}/admin/reservations/{{ reservation.id }}"
+                               style="background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;font-size:14px;display:inline-block;">
+                                Open in Admin Panel
+                            </a>
                         </td>
                     </tr>
 
@@ -105,7 +102,7 @@
                     <tr>
                         <td align="center" style="padding-top:25px;font-size:12px;color:#9ca3af;">
                             <p style="margin:0;">
-                                This is an automated notification. Please do not reply to this email.
+                                This is an automated system notification for administrators.
                             </p>
                         </td>
                     </tr>
