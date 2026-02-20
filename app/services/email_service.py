@@ -133,10 +133,7 @@ class EmailService:
         reservation: Reservation,
         old_status: ReservationStatus,
     ) -> None:
-        """Send status update email to user when reservation status changes."""
-        if not reservation.email:
-            return
-
+        """Send status update email to user and admin when reservation status changes."""
         # Only send if status actually changed and is a terminal state
         if reservation.status == old_status:
             return
@@ -148,21 +145,25 @@ class EmailService:
         ]:
             return
 
-        # Load and render template
-        template = self.env.get_template("status_update.html")
-        html_body = template.render(
-            reservation=reservation,
-            status=reservation.status,
-            old_status=old_status,
-        )
+        # Send to user if email exists
+        if reservation.email:
+            template = self.env.get_template("status_update.html")
+            html_body = template.render(
+                reservation=reservation,
+                status=reservation.status,
+                old_status=old_status,
+            )
 
-        status_text = reservation.status.value.lower()
-        subject = f"Reservation {status_text} - {reservation.branch.name}"
-        await self._send_email(
-            to_email=reservation.email,
-            subject=subject,
-            html_body=html_body,
-        )
+            status_text = reservation.status.value.lower()
+            subject = f"Reservation {status_text} - {reservation.branch.name}"
+            await self._send_email(
+                to_email=reservation.email,
+                subject=subject,
+                html_body=html_body,
+            )
+
+        # Always send status update to admin
+        await self.send_admin_status_update(reservation, old_status)
 
     async def send_admin_notification(self, reservation: Reservation) -> None:
         """Send notification email to admin about new reservation."""
@@ -176,6 +177,36 @@ class EmailService:
         html_body = template.render(reservation=reservation)
 
         subject = f"New reservation at {reservation.branch.name}"
+        await self._send_email(
+            to_email=admin_email,
+            subject=subject,
+            html_body=html_body,
+        )
+
+    async def send_admin_status_update(
+        self,
+        reservation: Reservation,
+        old_status: ReservationStatus,
+        updated_by: str | None = None,
+    ) -> None:
+        """Send status update notification email to admin."""
+        admin_email = self.settings.admin_email
+        if not admin_email:
+            logger.warning("Admin email not configured, skipping admin status update")
+            return
+
+        # Load and render admin-specific template
+        template = self.env.get_template("admin_status_update.html")
+        html_body = template.render(
+            reservation=reservation,
+            status=reservation.status,
+            old_status=old_status,
+            app_base_url=self.settings.app_base_url.rstrip("/"),
+            updated_by=updated_by,
+        )
+
+        status_text = reservation.status.value.lower()
+        subject = f"Reservation {status_text}: {reservation.full_name} - {reservation.branch.name}"
         await self._send_email(
             to_email=admin_email,
             subject=subject,

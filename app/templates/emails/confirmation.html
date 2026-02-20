@@ -1,120 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Confirm Your Reservation</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            margin-top: 0;
-        }
-        .reservation-details {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 4px;
-            margin: 20px 0;
-        }
-        .detail-row {
-            margin: 10px 0;
-        }
-        .detail-label {
-            font-weight: bold;
-            color: #555;
-        }
-        .button-container {
-            margin: 30px 0;
-            text-align: center;
-        }
-        .button {
-            display: inline-block;
-            padding: 12px 30px;
-            margin: 10px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 16px;
-        }
-        .button-confirm {
-            background-color: #28a745;
-            color: #ffffff;
-        }
-        .button-cancel {
-            background-color: #dc3545;
-            color: #ffffff;
-        }
-        .button:hover {
-            opacity: 0.9;
-        }
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            font-size: 12px;
-            color: #777;
-            text-align: center;
-        }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Please Confirm Your Reservation</h1>
-        <p>Hello {{ reservation.full_name }},</p>
-        <p>Thank you for making a reservation with us! Please confirm or cancel your reservation by clicking one of the buttons below.</p>
-        
-        <div class="reservation-details">
-            <div class="detail-row">
-                <span class="detail-label">Branch:</span> {{ reservation.branch.name }}
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Address:</span> {{ reservation.branch.address }}
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Table:</span> {{ reservation.table.table_number }}
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Date:</span> {{ reservation.reservation_date.strftime('%B %d, %Y') }}
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Time:</span> {{ reservation.start_time.strftime('%I:%M %p') }} - {{ reservation.end_time.strftime('%I:%M %p') }}
-            </div>
-            {% if reservation.notes %}
-            <div class="detail-row">
-                <span class="detail-label">Notes:</span> {{ reservation.notes }}
-            </div>
-            {% endif %}
-        </div>
-        
-        <div class="button-container">
-            <a href="{{ confirm_url }}" class="button button-confirm">Confirm Reservation</a>
-            <a href="{{ cancel_url }}" class="button button-cancel">Cancel Reservation</a>
-        </div>
-        
-        <p>If the buttons don't work, you can copy and paste these links into your browser:</p>
-        <p style="font-size: 12px; word-break: break-all;">
-            Confirm: {{ confirm_url }}<br>
-            Cancel: {{ cancel_url }}
-        </p>
-        
-        <div class="footer">
-            <p>This confirmation link will expire in 24 hours.</p>
-            <p>If you did not make this reservation, please ignore this email.</p>
-        </div>
-    </div>
+<body style="margin:0;padding:0;background-color:#f2f4f8;font-family:Arial,Helvetica,sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f8;padding:30px 15px;">
+        <tr>
+            <td align="center">
+
+                <!-- Main Card -->
+                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:10px;padding:30px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding-bottom:20px;">
+                            <h2 style="margin:0;color:#1f2937;font-size:22px;">
+                                📅 Please Confirm Your Reservation
+                            </h2>
+                            <p style="color:#6b7280;font-size:14px;margin-top:8px;">
+                                Hello {{ reservation.full_name }},
+                            </p>
+                            <p style="color:#6b7280;font-size:14px;margin-top:5px;">
+                                Thank you for booking with us! Please confirm or cancel your reservation below.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Reservation Details -->
+                    <tr>
+                        <td style="background:#f9fafb;border-radius:8px;padding:20px;">
+
+                            <p style="margin:8px 0;"><strong>Branch:</strong> {{ reservation.branch.name }}</p>
+                            <p style="margin:8px 0;"><strong>Address:</strong> {{ reservation.branch.address }}</p>
+                            <p style="margin:8px 0;"><strong>Table:</strong> {{ reservation.table.table_number }}</p>
+
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:15px 0;">
+
+                            <p style="margin:8px 0;"><strong>Date:</strong> {{ reservation.reservation_date.strftime('%B %d, %Y') }}</p>
+                            <p style="margin:8px 0;"><strong>Time:</strong> {{ reservation.start_time.strftime('%I:%M %p') }} - {{ reservation.end_time.strftime('%I:%M %p') }}</p>
+
+                            {% if reservation.notes %}
+                            <p style="margin:8px 0;"><strong>Notes:</strong> {{ reservation.notes }}</p>
+                            {% endif %}
+
+                        </td>
+                    </tr>
+
+                    <!-- Action Buttons -->
+                    <tr>
+                        <td align="center" style="padding-top:25px;">
+
+                            <!-- Confirm Button -->
+                            <a href="{{ confirm_url }}"
+                               style="background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;font-size:14px;display:inline-block;margin:8px;">
+                                ✅ Confirm Reservation
+                            </a>
+
+                            <!-- Cancel Button -->
+                            <a href="{{ cancel_url }}"
+                               style="background:#dc2626;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;font-size:14px;display:inline-block;margin:8px;">
+                                ❌ Cancel Reservation
+                            </a>
+
+                        </td>
+                    </tr>
+
+                    <!-- Backup Links -->
+                    <tr>
+                        <td style="padding-top:20px;font-size:12px;color:#6b7280;">
+                            <p>If the buttons do not work, copy and paste these links into your browser:</p>
+                            <p style="word-break:break-all;">
+                                <strong>Confirm:</strong> {{ confirm_url }}<br>
+                                <strong>Cancel:</strong> {{ cancel_url }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding-top:25px;font-size:12px;color:#9ca3af;">
+                            <p style="margin:0;">This confirmation link will expire in 24 hours.</p>
+                            <p style="margin:5px 0 0 0;">If you did not make this reservation, please ignore this email.</p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>
