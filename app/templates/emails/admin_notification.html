@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Reservation Notification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-confirmed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .reservation-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            margin: 10px 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>New Reservation Received</h1>
+        <p>A new reservation has been created and requires your attention.</p>
+        
+        <div class="status-badge {% if reservation.status.value == 'PENDING' %}status-pending{% else %}status-confirmed{% endif %}">
+            {{ reservation.status.value }}
+        </div>
+        
+        <div class="reservation-details">
+            <div class="detail-row">
+                <span class="detail-label">Reservation ID:</span> {{ reservation.id }}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Customer Name:</span> <span class="highlight">{{ reservation.full_name }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Phone:</span> {{ reservation.phone_number }}
+            </div>
+            {% if reservation.email %}
+            <div class="detail-row">
+                <span class="detail-label">Email:</span> {{ reservation.email }}
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <span class="detail-label">Branch:</span> {{ reservation.branch.name }}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Address:</span> {{ reservation.branch.address }}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Table:</span> {{ reservation.table.table_number }} (Capacity: {{ reservation.table.capacity }})
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Date:</span> {{ reservation.reservation_date.strftime('%B %d, %Y') }}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Time:</span> {{ reservation.start_time.strftime('%I:%M %p') }} - {{ reservation.end_time.strftime('%I:%M %p') }}
+            </div>
+            {% if reservation.notes %}
+            <div class="detail-row">
+                <span class="detail-label">Notes:</span> {{ reservation.notes }}
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <span class="detail-label">Created At:</span> {{ reservation.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+            </div>
+        </div>
+        
+        {% if reservation.status.value == 'PENDING' and reservation.email %}
+        <p><strong>Note:</strong> This reservation is pending user confirmation. The customer will receive a confirmation email.</p>
+        {% elif not reservation.email %}
+        <p><strong>Note:</strong> This reservation requires admin confirmation as the customer did not provide an email address.</p>
+        {% endif %}
+        
+        <div class="footer">
+            <p>Please log into the admin panel to manage this reservation.</p>
+        </div>
+    </div>
+</body>
+</html>
