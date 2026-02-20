@@ -139,8 +139,8 @@ class TimeslotService:
                     break
             if slot_free:
                 available.append({
-                    "start_time": start_t.strftime("%H:%M"),
-                    "end_time": end_t.strftime("%H:%M"),
+                    "start_time": str(start_t.strftime("%H:%M")),
+                    "end_time": str(end_t.strftime("%H:%M")),
                 })
 
         await self._caching.set_slots(branch_id, d, available)
