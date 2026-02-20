@@ -1,0 +1,185 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { confirmReservation } from '@/lib/api';
+import { ReservationResponse } from '@/lib/types';
+import { formatDateDisplay, formatTime } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Navbar } from '@/components/Navbar';
+import { LoadingPage } from '@/components/ui/loading';
+import toast from 'react-hot-toast';
+
+export default function ConfirmReservationPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const reservationId = params.id as string;
+  const token = searchParams.get('token');
+
+  const [reservation, setReservation] = useState<ReservationResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    async function handleConfirmation() {
+      if (!reservationId) {
+        toast.error('Reservation ID not found');
+        router.push('/');
+        return;
+      }
+
+      if (!token) {
+        toast.error('Confirmation token is required');
+        router.push('/');
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        setIsLoading(true);
+        const data = await confirmReservation(reservationId, token);
+        setReservation(data);
+        toast.success('Reservation confirmed successfully!');
+      } catch (err: any) {
+        const errorMessage =
+          err?.response?.data?.detail || err?.message || 'Failed to confirm reservation';
+        toast.error(errorMessage);
+        // Don't redirect on error, show error state
+      } finally {
+        setIsLoading(false);
+        setIsProcessing(false);
+      }
+    }
+
+    handleConfirmation();
+  }, [reservationId, token, router]);
+
+  if (isLoading || isProcessing) {
+    return (
+      <>
+        <Navbar />
+        <LoadingPage />
+      </>
+    );
+  }
+
+  if (!reservation) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <Card variant="elevated">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl text-red-600">Confirmation Failed</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-secondary-600 text-center">
+                  We couldn&apos;t confirm your reservation. The link may have expired or is invalid.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <Link href="/" className="flex-1">
+                    <Button variant="primary" className="w-full">
+                      Back to Home
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Card variant="elevated">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <CardTitle className="text-2xl">Reservation Confirmed!</CardTitle>
+              <p className="text-secondary-600 mt-2">
+                Your reservation has been successfully confirmed.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-secondary-50 rounded-xl p-6 space-y-3">
+                <div>
+                  <p className="text-sm text-secondary-600">Name</p>
+                  <p className="font-semibold text-secondary-900">{reservation.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-secondary-600">Phone</p>
+                  <p className="font-semibold text-secondary-900">{reservation.phone_number}</p>
+                </div>
+                {reservation.email && (
+                  <div>
+                    <p className="text-sm text-secondary-600">Email</p>
+                    <p className="font-semibold text-secondary-900">{reservation.email}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-secondary-600">Date & Time</p>
+                  <p className="font-semibold text-secondary-900">
+                    {formatDateDisplay(reservation.reservation_date)} at{' '}
+                    {formatTime(reservation.start_time)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-secondary-600">Reservation ID</p>
+                  <p className="font-semibold text-secondary-900 font-mono text-sm">
+                    {reservation.id}
+                  </p>
+                </div>
+                {reservation.notes && (
+                  <div>
+                    <p className="text-sm text-secondary-600">Special Requests</p>
+                    <p className="font-semibold text-secondary-900">{reservation.notes}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-secondary-600">Status</p>
+                  <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                    {reservation.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Link href="/" className="flex-1">
+                  <Button variant="primary" className="w-full">
+                    Back to Home
+                  </Button>
+                </Link>
+              </div>
+
+              <p className="text-sm text-secondary-500 text-center pt-4">
+                We look forward to seeing you!
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     smtp_from_email: str = Field(default="noreply@example.com", alias="SMTP_FROM_EMAIL")
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
+    frontend_base_url: str = Field(default="http://localhost:3000", alias="FRONTEND_BASE_URL")
 
 
 @lru_cache
