@@ -10,10 +10,6 @@ import { Navbar } from '@/components/Navbar';
 import { ReservationForm } from '@/components/ReservationForm';
 import { TableSelection } from '@/components/TableSelection';
 import { LoadingPage } from '@/components/ui/loading';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import toast from 'react-hot-toast';
 
 const UserTableSelector = dynamic(
   () =>
@@ -22,6 +18,16 @@ const UserTableSelector = dynamic(
     })),
   { ssr: false }
 );
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import toast from 'react-hot-toast';
+
+function isUuid(s: string): boolean {
+  const u =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return u.test(s);
+}
 
 function layoutTableToTableResponse(
   t: LayoutTable,
@@ -39,14 +45,14 @@ function layoutTableToTableResponse(
   };
 }
 
-export default function ReservationPage() {
+export default function ReservePage() {
   const params = useParams();
   const router = useRouter();
-  const restaurantSlug = (params?.restaurantSlug as string) ?? '';
+  const restaurantId = (params?.restaurantId as string) ?? '';
 
   const [branch, setBranch] = useState<BranchResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [slugMap, setSlugMap] = useState<Map<string, BranchResponse>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
   const [date, setDate] = useState(getTodayDate());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -58,20 +64,21 @@ export default function ReservationPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    async function fetchBranchData() {
+    async function run() {
+      if (!restaurantId) return;
       try {
         setIsLoading(true);
         const branches = await getBranches();
         const map = createSlugToBranchMap(branches);
         setSlugMap(map);
-
-        const branchId = getBranchIdFromSlug(restaurantSlug, map);
+        const branchId = isUuid(restaurantId)
+          ? restaurantId
+          : getBranchIdFromSlug(restaurantId, map);
         if (!branchId) {
           toast.error('Restaurant not found');
           router.push('/');
           return;
         }
-
         const branchData = await getBranch(branchId);
         if (!branchData.is_active) {
           toast.error('This restaurant is currently closed');
@@ -86,18 +93,14 @@ export default function ReservationPage() {
           setHasLayout(false);
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load restaurant';
-        toast.error(errorMessage);
+        toast.error(err instanceof Error ? err.message : 'Failed to load');
         router.push('/');
       } finally {
         setIsLoading(false);
       }
     }
-
-    if (restaurantSlug) {
-      fetchBranchData();
-    }
-  }, [restaurantSlug, router]);
+    run();
+  }, [restaurantId, router]);
 
   useEffect(() => {
     if (!branch) return;
@@ -180,14 +183,6 @@ export default function ReservationPage() {
             <CardContent className="p-6">
               <h1 className="text-3xl font-bold text-secondary-900 mb-2">{branch.name}</h1>
               <p className="text-secondary-600 mb-4">{branch.address}</p>
-              <div className="flex items-center gap-4 text-sm text-secondary-500">
-                <span>
-                  Hours: {branch.opening_time.substring(0, 5)} – {branch.closing_time.substring(0, 5)}
-                </span>
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                  Open
-                </span>
-              </div>
             </CardContent>
           </Card>
 
@@ -271,7 +266,6 @@ export default function ReservationPage() {
                   table_number: table.table_number,
                 });
                 setSelectedTableId(table.id);
-                setConfirmedTable(true);
               }}
             />
           )}

@@ -5,9 +5,15 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
-  // Ensure proper image optimization
   images: {
     unoptimized: true,
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('canvas');
+    }
+    return config;
   },
 }
 

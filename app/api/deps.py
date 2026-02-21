@@ -3,7 +3,7 @@
 from uuid import UUID
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,8 +78,20 @@ async def get_current_admin(
     return admin
 
 
+async def get_guest_id(request: Request) -> UUID:
+    """Read guest_id from request state (set by GuestMiddleware). Raises 401 if missing."""
+    guest_id = getattr(request.state, "guest_id", None)
+    if guest_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Guest identification required",
+        )
+    return guest_id
+
+
 # Type aliases for injection
 ConfigDep = Annotated[Settings, Depends(get_config)]
+GuestIdDep = Annotated[UUID, Depends(get_guest_id)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 CurrentAdmin = Annotated[Admin, Depends(get_current_admin)]

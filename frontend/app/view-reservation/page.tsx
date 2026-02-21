@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, useParams, useRouter } from 'next/navigation';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getReservation, attachReservationToGuest } from '@/lib/api';
-import { ReservationResponse } from '@/lib/types';
+import type { ReservationResponse } from '@/lib/types';
 import { formatDateDisplay, formatTime } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,10 @@ import { Navbar } from '@/components/Navbar';
 import { LoadingPage } from '@/components/ui/loading';
 import toast from 'react-hot-toast';
 
-export default function SuccessPage() {
-  const params = useParams();
+function ViewReservationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const restaurantSlug = params.restaurantSlug as string;
-  const reservationId = searchParams.get('id');
+  const id = searchParams.get('id');
   const code = searchParams.get('code');
 
   const [reservation, setReservation] = useState<ReservationResponse | null>(null);
@@ -25,34 +23,33 @@ export default function SuccessPage() {
 
   useEffect(() => {
     async function fetchReservation() {
-      if (!reservationId) {
-        toast.error('Reservation ID not found');
-        router.push('/');
+      if (!id || !code) {
+        toast.error('Reservation ID and code are required');
+        router.push('/my-reservations');
         return;
       }
 
       try {
         setIsLoading(true);
-        const data = await getReservation(reservationId, code ?? undefined);
+        const data = await getReservation(id, code);
         setReservation(data);
-        if (code) {
-          try {
-            await attachReservationToGuest(reservationId, code);
-          } catch {
-            // Already attached or other
-          }
+        try {
+          await attachReservationToGuest(id, code);
+          toast.success('Added to My Reservations');
+        } catch {
+          // Already attached or other; reservation still shown
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load reservation';
         toast.error(errorMessage);
-        router.push('/');
+        router.push('/my-reservations');
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchReservation();
-  }, [reservationId, code, router]);
+  }, [id, code, router]);
 
   if (isLoading) {
     return (
@@ -74,22 +71,7 @@ export default function SuccessPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Card variant="elevated">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg
-                  className="w-8 h-8 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <CardTitle className="text-2xl">Reservation Confirmed!</CardTitle>
+              <CardTitle className="text-2xl">Your Reservation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-secondary-50 rounded-xl p-6 space-y-3">
@@ -110,7 +92,8 @@ export default function SuccessPage() {
                 <div>
                   <p className="text-sm text-secondary-600">Date & Time</p>
                   <p className="font-semibold text-secondary-900">
-                    {formatDateDisplay(reservation.reservation_date)} at {formatTime(reservation.start_time)}
+                    {formatDateDisplay(reservation.reservation_date)} at{' '}
+                    {formatTime(reservation.start_time)}
                   </p>
                 </div>
                 <div>
@@ -134,14 +117,9 @@ export default function SuccessPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href={`/${restaurantSlug}`} className="flex-1">
-                  <Button variant="outline" className="w-full">
-                    Make Another Reservation
-                  </Button>
-                </Link>
                 <Link href="/my-reservations" className="flex-1">
                   <Button variant="outline" className="w-full">
-                    View my reservations
+                    Back to My Reservations
                   </Button>
                 </Link>
                 <Link href="/" className="flex-1">
@@ -150,14 +128,25 @@ export default function SuccessPage() {
                   </Button>
                 </Link>
               </div>
-
-              <p className="text-sm text-secondary-500 text-center pt-4">
-                A confirmation email has been sent to {reservation.email || 'your email address'}
-              </p>
             </CardContent>
           </Card>
         </div>
       </div>
     </>
+  );
+}
+
+export default function ViewReservationPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Navbar />
+          <LoadingPage />
+        </>
+      }
+    >
+      <ViewReservationContent />
+    </Suspense>
   );
 }
