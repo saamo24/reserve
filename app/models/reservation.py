@@ -47,6 +47,8 @@ class Reservation(Base, TimestampMixin):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=__import__("uuid").uuid4)
+    guest_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
+    reservation_code: Mapped[str | None] = mapped_column(String(8), unique=True, nullable=True, index=True)
     branch_id: Mapped[UUID] = mapped_column(
         ForeignKey("branches.id", ondelete="CASCADE"),
         nullable=False,

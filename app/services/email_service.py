@@ -108,10 +108,10 @@ class EmailService:
         confirm_token = create_reservation_token(reservation.id, "confirm")
         cancel_token = create_reservation_token(reservation.id, "cancel")
 
-        # Build URLs
-        base_url = self.settings.app_base_url.rstrip("/")
-        confirm_url = f"{base_url}/reservations/{reservation.id}/confirm?token={confirm_token}"
-        cancel_url = f"{base_url}/reservations/{reservation.id}/cancel?token={cancel_token}"
+        # Build URLs - use frontend URL for user-facing links
+        frontend_url = self.settings.frontend_base_url.rstrip("/")
+        confirm_url = f"{frontend_url}/reservations/{reservation.id}/confirm?token={confirm_token}"
+        cancel_url = f"{frontend_url}/reservations/{reservation.id}/cancel?token={cancel_token}"
 
         # Load and render template
         template = self.env.get_template("confirmation.html")
@@ -173,8 +173,13 @@ class EmailService:
             return
 
         # Load and render template
+        # Use frontend URL for admin panel links
+        frontend_url = self.settings.frontend_base_url.rstrip("/")
         template = self.env.get_template("admin_notification.html")
-        html_body = template.render(reservation=reservation)
+        html_body = template.render(
+            reservation=reservation,
+            app_base_url=frontend_url,
+        )
 
         subject = f"New reservation at {reservation.branch.name}"
         await self._send_email(
@@ -196,12 +201,14 @@ class EmailService:
             return
 
         # Load and render admin-specific template
+        # Use frontend URL for admin panel links
+        frontend_url = self.settings.frontend_base_url.rstrip("/")
         template = self.env.get_template("admin_status_update.html")
         html_body = template.render(
             reservation=reservation,
             status=reservation.status,
             old_status=old_status,
-            app_base_url=self.settings.app_base_url.rstrip("/"),
+            app_base_url=frontend_url,
             updated_by=updated_by,
         )
 

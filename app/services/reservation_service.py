@@ -1,5 +1,6 @@
 """Reservation business logic: create, get, list, update with locking and cache invalidation."""
 
+import secrets
 from datetime import date, time, timedelta
 from uuid import UUID
 
@@ -18,6 +19,11 @@ from app.services.email_service import EmailService
 from app.services.locking_service import LockingService
 from app.services.timeslot_service import TimeslotService
 from app.utils.validators import get_now_in_timezone, time_in_range
+
+
+def _generate_reservation_code() -> str:
+    """Return an 8-character random string for reservation lookup."""
+    return secrets.token_hex(4)
 
 
 def _slot_end(start: time, duration_minutes: int) -> time:
@@ -47,10 +53,11 @@ class ReservationService:
         self._locking = locking
         self._caching = caching
 
-    async def create(self, body: ReservationCreate) -> Reservation:
+    async def create(self, body: ReservationCreate, guest_id: UUID) -> Reservation:
         """
         Create reservation. Validates date, branch, time in hours; acquires lock;
         creates in transaction; invalidates cache; releases lock in finally.
+        guest_id is taken from signed cookie only (never from body).
         Raises: ValueError (validation), 404 (branch/table not found), 409 (conflict), 423 (locked).
         """
         branch = await self._branch_repo.get_by_id(body.branch_id)
@@ -102,6 +109,8 @@ class ReservationService:
             )
 
             reservation = Reservation(
+                guest_id=guest_id,
+                reservation_code=_generate_reservation_code(),
                 branch_id=body.branch_id,
                 table_id=table_id,
                 full_name=body.full_name,
@@ -174,6 +183,62 @@ class ReservationService:
         """Get reservation by id (with branch and table loaded)."""
         return await self._reservation_repo.get_by_id(
             id, load_branch=load_relations, load_table=load_relations
+        )
+
+    async def get_by_id_and_guest(
+        self, id: UUID, guest_id: UUID, load_relations: bool = True
+    ) -> Reservation | None:
+        """Get reservation by id only if it belongs to the guest. Returns None otherwise."""
+        return await self._reservation_repo.get_by_id_and_guest_id(
+            id, guest_id, load_branch=load_relations, load_table=load_relations
+        )
+
+    async def get_by_id_and_code(
+        self, id: UUID, code: str, load_relations: bool = True
+    ) -> Reservation | None:
+        """Get reservation by id and reservation_code (e.g. for success page link)."""
+        return await self._reservation_repo.get_by_id_and_code(
+            id, code, load_branch=load_relations, load_table=load_relations
+        )
+
+    async def attach_to_guest(
+        self, reservation_id: UUID, code: str, guest_id: UUID
+    ) -> Reservation | None:
+        """Link a reservation to the current guest by proving ownership with id+code. Returns updated reservation or None."""
+        reservation = await self._reservation_repo.get_by_id_and_code(
+            reservation_id, code, load_branch=False, load_table=False
+        )
+        if reservation is None:
+            return None
+        reservation.guest_id = guest_id
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+        return await self._reservation_repo.get_by_id(
+            reservation_id, load_branch=True, load_table=True
+        )
+
+    async def attach_to_guest_by_id(
+        self, reservation_id: UUID, guest_id: UUID
+    ) -> Reservation | None:
+        """Link a reservation to the current guest by id only. For local dev only (no code check)."""
+        reservation = await self._reservation_repo.get_by_id(
+            reservation_id, load_branch=False, load_table=False
+        )
+        if reservation is None:
+            return None
+        reservation.guest_id = guest_id
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+        return await self._reservation_repo.get_by_id(
+            reservation_id, load_branch=True, load_table=True
+        )
+
+    async def list_my_reservations(
+        self, guest_id: UUID, skip: int = 0, limit: int = 50
+    ) -> tuple[list[Reservation], int]:
+        """List reservations for the given guest, newest first. Returns (items, total)."""
+        return await self._reservation_repo.list_by_guest_id(
+            guest_id, skip=skip, limit=limit
         )
 
     async def confirm_reservation(self, id: UUID, token: str) -> Reservation | None:

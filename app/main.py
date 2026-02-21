@@ -8,8 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.admin import admin_router as admin_router
 from app.api.auth import router as auth_router
 from app.api.public import public_router as public_router
+from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.redis import close_redis, get_redis
+from app.middleware.guest import GuestMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 
 
@@ -35,13 +37,30 @@ app = FastAPI(
 )
 # Request logging first (outermost) so every request is logged
 app.add_middleware(RequestLoggingMiddleware)
+
+# With credentials (cookies), CORS cannot use "*"; must list explicit origins.
+_settings = get_settings()
+_cors_origins = [_settings.frontend_base_url]
+try:
+    from urllib.parse import urlparse
+    parsed = urlparse(_settings.frontend_base_url)
+    if parsed.port:
+        # Next.js dev often serves on 0.0.0.0:port; allow that origin too.
+        _cors_origins.append(f"http://0.0.0.0:{parsed.port}")
+        # Allow 127.0.0.1 so cookies work when frontend is opened as 127.0.0.1 (same-origin for cookie send).
+        if "localhost" in _settings.frontend_base_url or (parsed.hostname in ("localhost", "127.0.0.1")):
+            _cors_origins.append(f"http://127.0.0.1:{parsed.port}")
+except Exception:
+    pass
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GuestMiddleware)
 
 app.include_router(auth_router)
 app.include_router(admin_router, prefix="/admin")

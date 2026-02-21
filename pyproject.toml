@@ -19,6 +19,7 @@ dependencies = [
     "bcrypt>=4.0.0",
     "aiosmtplib>=2.0.0",
     "jinja2>=3.1.0",
+    "itsdangerous>=2.1.0",
 ]
 
 [project.optional-dependencies]
