@@ -49,6 +49,11 @@ uvicorn app.main:app --reload
 
 **My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Keep `APP_ENV=development` in `.env` for this behavior.
 
+## Deploying to Render
+
+- **Backend (Docker):** Use the root `Dockerfile`. To seed the DB on first deploy, set env `RUN_POPULATE=1` (or `RUN_POPULATE=true`) on the API service; the entrypoint will run migrations then `python scripts/seed.py` before starting the server. Remove the var after the first run to avoid re-running seed on every deploy. Alternatively run a one-off with the same image and start command: `./scripts/run-populate.sh` (migrations + seed then exit).
+- **Frontend:** Set `NEXT_PUBLIC_API_URL` to your backend URL (e.g. `https://your-api.onrender.com`) and redeploy so the build uses it; otherwise the app will call `localhost:8000` and you’ll see `ERR_CONNECTION_REFUSED`.
+
 ## Scaling Notes
 
 - **Horizontal scaling**: Run multiple API containers behind a load balancer. Use a single shared PostgreSQL and Redis; no in-memory locks.

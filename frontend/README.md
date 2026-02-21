@@ -75,6 +75,10 @@ Create a `.env.local` file:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
+### Deploying (e.g. Render)
+
+If the frontend is deployed but the browser shows `ERR_CONNECTION_REFUSED` to `localhost:8000`, the app was built with the default API URL. Set **`NEXT_PUBLIC_API_URL`** on the frontend service to your backend’s public URL (e.g. `https://your-api.onrender.com`), then **redeploy** so the build picks it up. This value is baked in at build time.
+
 ## Project Structure
 
 ```
