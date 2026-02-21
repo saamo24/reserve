@@ -40,7 +40,7 @@ class ReservationUpdate(BaseModel):
 
 
 class ReservationResponse(BaseModel):
-    """Reservation response schema."""
+    """Reservation response schema. guest_id is not exposed."""
 
     id: UUID
     branch_id: UUID
@@ -53,6 +53,7 @@ class ReservationResponse(BaseModel):
     end_time: time
     status: ReservationStatus
     notes: str | None
+    reservation_code: str | None = None
     created_at: datetime
     updated_at: datetime
 

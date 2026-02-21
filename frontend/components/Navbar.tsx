@@ -11,6 +11,12 @@ export function Navbar() {
           </Link>
           <div className="flex items-center space-x-4">
             <Link
+              href="/my-reservations"
+              className="text-secondary-600 hover:text-secondary-900 transition-colors"
+            >
+              My Reservations
+            </Link>
+            <Link
               href="/admin/login"
               className="text-secondary-600 hover:text-secondary-900 transition-colors"
             >

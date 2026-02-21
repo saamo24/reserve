@@ -4,6 +4,7 @@ from datetime import time
 from uuid import UUID
 
 from sqlalchemy import Index, String, Time
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -23,6 +24,7 @@ class Branch(Base, TimestampMixin):
     closing_time: Mapped[time] = mapped_column(Time, nullable=False)
     slot_duration_minutes: Mapped[int] = mapped_column(nullable=False, default=120)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    layout_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     tables: Mapped[list["Table"]] = relationship(
         "Table",

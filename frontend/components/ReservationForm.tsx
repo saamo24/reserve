@@ -312,7 +312,8 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      router.push(`/${encodeURIComponent(slug)}/success?id=${reservation.id}`);
+      const codeParam = reservation.reservation_code ? `&code=${encodeURIComponent(reservation.reservation_code)}` : '';
+      router.push(`/${encodeURIComponent(slug)}/success?id=${reservation.id}${codeParam}`);
     } catch (err: any) {
       const errorMessage =
         err?.response?.data?.detail || err?.message || 'Failed to create reservation';

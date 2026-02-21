@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Reservations', href: '/admin/reservations', icon: '📅' },
   { name: 'Branches', href: '/admin/branches', icon: '🏢' },
   { name: 'Tables', href: '/admin/tables', icon: '🪑' },
+  { name: 'Layout', href: '/admin/layout', icon: '🗺️' },
 ];
 
 export function AdminSidebar() {

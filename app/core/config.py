@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     app_base_url: str = Field(default="http://localhost:8000", alias="APP_BASE_URL")
     frontend_base_url: str = Field(default="http://localhost:3000", alias="FRONTEND_BASE_URL")
+
+    # Guest cookie (signed HTTP-only guest_id); set GUEST_COOKIE_SECURE=false for local HTTP
+    guest_cookie_secure: bool = Field(default=False, alias="GUEST_COOKIE_SECURE")
+    guest_cookie_max_age: int = Field(
+        default=30 * 24 * 3600,
+        ge=1,
+        alias="GUEST_COOKIE_MAX_AGE",
+    )
 
 
 @lru_cache

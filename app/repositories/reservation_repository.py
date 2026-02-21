@@ -34,6 +34,76 @@ class ReservationRepository(AsyncRepository[Reservation]):
         result = await self._session.execute(q)
         return result.scalar_one_or_none()
 
+    async def get_by_id_and_guest_id(
+        self,
+        id: UUID,
+        guest_id: UUID,
+        *,
+        load_branch: bool = False,
+        load_table: bool = False,
+    ) -> Reservation | None:
+        """Get reservation by id only if it belongs to the given guest. Returns None otherwise."""
+        q = select(Reservation).where(
+            Reservation.id == id,
+            Reservation.guest_id == guest_id,
+        )
+        if load_branch:
+            q = q.options(selectinload(Reservation.branch))
+        if load_table:
+            q = q.options(selectinload(Reservation.table))
+        result = await self._session.execute(q)
+        return result.scalar_one_or_none()
+
+    async def get_by_id_and_code(
+        self,
+        id: UUID,
+        code: str,
+        *,
+        load_branch: bool = False,
+        load_table: bool = False,
+    ) -> Reservation | None:
+        """Get reservation by id and reservation_code (for success page / link sharing)."""
+        q = select(Reservation).where(
+            Reservation.id == id,
+            Reservation.reservation_code == code,
+        )
+        if load_branch:
+            q = q.options(selectinload(Reservation.branch))
+        if load_table:
+            q = q.options(selectinload(Reservation.table))
+        result = await self._session.execute(q)
+        return result.scalar_one_or_none()
+
+    async def list_by_guest_id(
+        self,
+        guest_id: UUID,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Reservation], int]:
+        """List reservations for a guest, newest first (date desc, start_time desc). Returns (items, total)."""
+        base = select(Reservation).where(Reservation.guest_id == guest_id)
+        count_q = select(func.count(Reservation.id)).where(
+            Reservation.guest_id == guest_id
+        )
+        total_result = await self._session.execute(count_q)
+        total = total_result.scalar_one() or 0
+        base = (
+            base.order_by(
+                Reservation.reservation_date.desc(),
+                Reservation.start_time.desc(),
+            )
+            .offset(skip)
+            .limit(limit)
+            .options(
+                selectinload(Reservation.branch),
+                selectinload(Reservation.table),
+            )
+        )
+        result = await self._session.execute(base)
+        items = list(result.scalars().all())
+        return items, total
+
     async def has_overlapping(
         self,
         table_id: UUID,
@@ -70,6 +140,25 @@ class ReservationRepository(AsyncRepository[Reservation]):
             )
         )
         return list(result.scalars().all())
+
+    async def list_reserved_table_ids_for_slot(
+        self,
+        branch_id: UUID,
+        reservation_date: date,
+        start_time: time,
+        end_time: time,
+    ) -> list[UUID]:
+        """Return table IDs that have an active reservation overlapping the given slot."""
+        result = await self._session.execute(
+            select(Reservation.table_id).where(
+                Reservation.branch_id == branch_id,
+                Reservation.reservation_date == reservation_date,
+                Reservation.status.not_in([ReservationStatus.CANCELLED]),
+                Reservation.start_time < end_time,
+                Reservation.end_time > start_time,
+            )
+        )
+        return list({row[0] for row in result.all()})
 
     async def create(self, reservation: Reservation) -> Reservation:
         """Create reservation. Raises IntegrityError if partial unique violated."""

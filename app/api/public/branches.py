@@ -1,18 +1,19 @@
 """Public branch and slot endpoints."""
 
-from datetime import date
+from datetime import date, time
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import DbSession, RedisDep
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.reservation_repository import ReservationRepository
 from app.repositories.table_repository import TableRepository
 from app.schemas.branch import BranchResponse
+from app.schemas.layout import LayoutPayload, layout_from_dict
 from app.schemas.table import TableResponse
 from app.services.caching_service import CachingService
 from app.services.timeslot_service import TimeslotService
-from app.repositories.reservation_repository import ReservationRepository
 
 router = APIRouter(prefix="/branches", tags=["public-branches"])
 
@@ -57,3 +58,33 @@ async def list_tables(branch_id: UUID, db: DbSession) -> list:
     repo = TableRepository(db)
     tables = await repo.list_by_branch(branch_id, active_only=True)
     return tables
+
+
+@router.get("/{branch_id}/layout", response_model=LayoutPayload)
+async def get_layout(branch_id: UUID, db: DbSession) -> LayoutPayload:
+    """Get floor plan layout for a branch (read-only). Returns empty layout if none."""
+    repo = BranchRepository(db)
+    branch = await repo.get_by_id(branch_id)
+    if branch is None:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    return layout_from_dict(branch.layout_json)
+
+
+@router.get("/{branch_id}/reserved-tables")
+async def get_reserved_tables(
+    branch_id: UUID,
+    db: DbSession,
+    reservation_date: date = Query(..., alias="date"),
+    start_time: time = Query(..., description="Slot start time (HH:MM or HH:MM:SS)"),
+    end_time: time = Query(..., description="Slot end time (HH:MM or HH:MM:SS)"),
+) -> list[str]:
+    """Return table IDs (UUIDs as strings) reserved for the given slot."""
+    branch_repo = BranchRepository(db)
+    reservation_repo = ReservationRepository(db)
+    branch = await branch_repo.get_by_id(branch_id)
+    if branch is None:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    ids = await reservation_repo.list_reserved_table_ids_for_slot(
+        branch_id, reservation_date, start_time, end_time
+    )
+    return [str(i) for i in ids]

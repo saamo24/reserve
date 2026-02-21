@@ -47,6 +47,8 @@ python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
+**My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Keep `APP_ENV=development` in `.env` for this behavior.
+
 ## Scaling Notes
 
 - **Horizontal scaling**: Run multiple API containers behind a load balancer. Use a single shared PostgreSQL and Redis; no in-memory locks.
