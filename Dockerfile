@@ -20,7 +20,7 @@ COPY alembic/ ./alembic/
 COPY alembic.ini ./
 COPY entrypoint.sh ./
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh && chmod +x scripts/*.sh 2>/dev/null || true
 # Ownership
 RUN chown -R app:app /app
 
