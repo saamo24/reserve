@@ -77,7 +77,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ### Deploying (e.g. Render)
 
-If the frontend is deployed but the browser shows `ERR_CONNECTION_REFUSED` to `localhost:8000`, the app was built with the default API URL. Set **`NEXT_PUBLIC_API_URL`** on the frontend service to your backend’s public URL (e.g. `https://your-api.onrender.com`), then **redeploy** so the build picks it up. This value is baked in at build time.
+If the frontend is deployed but the browser shows `ERR_CONNECTION_REFUSED` to `localhost:8000`, the app was built with the default API URL. Set **`NEXT_PUBLIC_API_URL`** on the frontend service to your backend’s public URL (e.g. `https://your-api.onrender.com`), then **redeploy** so the build picks it up. The Dockerfile declares it as a build arg so the Next.js build bakes it in. Use the URL with no trailing slash. Use "Clear build cache & deploy" if you already had the var but still saw localhost:8000.
 
 ## Project Structure
 
