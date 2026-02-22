@@ -71,9 +71,15 @@ class Reservation(Base, TimestampMixin):
         default=ReservationStatus.CONFIRMED,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    qr_code_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     branch: Mapped["Branch"] = relationship("Branch")
     table: Mapped["Table"] = relationship("Table", back_populates="reservations")
+
+    @property
+    def qr_code(self) -> str | None:
+        """Alias for qr_code_base64 for API response (base64 PNG)."""
+        return self.qr_code_base64
 
     def __repr__(self) -> str:
         return f"<Reservation(id={self.id}, branch_id={self.branch_id}, date={self.reservation_date})>"

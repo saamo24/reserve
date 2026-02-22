@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import DbSession, GuestIdDep, RedisDep
 from app.core.config import get_settings
-from app.schemas.reservation import ReservationCreate, ReservationResponse
+from app.schemas.reservation import ReservationCreate, ReservationResponsePublic
 from app.services import ConflictError, LockedError, NotFoundError
 from app.services.reservation_service import ReservationService
 from app.services.locking_service import LockingService
@@ -31,13 +31,13 @@ def _reservation_service(db: DbSession, redis: RedisDep) -> ReservationService:
     )
 
 
-@router.post("", response_model=ReservationResponse, status_code=201)
+@router.post("", response_model=ReservationResponsePublic, status_code=201)
 async def create_reservation(
     body: ReservationCreate,
     db: DbSession,
     redis: RedisDep,
     guest_id: GuestIdDep,
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """Create a reservation. guest_id from signed cookie only; never from body."""
     service = _reservation_service(db, redis)
     try:
@@ -53,28 +53,28 @@ async def create_reservation(
         raise HTTPException(status_code=423, detail=str(e))
 
 
-@router.get("/me", response_model=list[ReservationResponse])
+@router.get("/me", response_model=list[ReservationResponsePublic])
 async def list_my_reservations(
     guest_id: GuestIdDep,
     db: DbSession,
     redis: RedisDep,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-) -> list[ReservationResponse]:
+) -> list[ReservationResponsePublic]:
     """List reservations for the current guest (from cookie). Sorted by date/time descending. Empty list if none."""
     service = _reservation_service(db, redis)
     items, _ = await service.list_my_reservations(guest_id, skip=skip, limit=limit)
     return list(items)
 
 
-@router.post("/{reservation_id}/attach", response_model=ReservationResponse)
+@router.post("/{reservation_id}/attach", response_model=ReservationResponsePublic)
 async def attach_reservation_to_guest(
     reservation_id: UUID,
     guest_id: GuestIdDep,
     db: DbSession,
     redis: RedisDep,
     code: str = Query(..., description="Reservation code to prove ownership"),
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """Link a reservation to the current guest so it appears in My Reservations. Requires id+code."""
     service = _reservation_service(db, redis)
     reservation = await service.attach_to_guest(reservation_id, code, guest_id)
@@ -83,13 +83,13 @@ async def attach_reservation_to_guest(
     return reservation
 
 
-@router.post("/dev/attach/{reservation_id}", response_model=ReservationResponse)
+@router.post("/dev/attach/{reservation_id}", response_model=ReservationResponsePublic)
 async def dev_attach_reservation_to_guest(
     reservation_id: UUID,
     guest_id: GuestIdDep,
     db: DbSession,
     redis: RedisDep,
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """[Development only] Link a reservation to the current guest by ID (no code). Use for local testing."""
     if get_settings().app_env != "development":
         raise HTTPException(status_code=404, detail="Not found")
@@ -100,14 +100,14 @@ async def dev_attach_reservation_to_guest(
     return reservation
 
 
-@router.get("/{reservation_id}", response_model=ReservationResponse)
+@router.get("/{reservation_id}", response_model=ReservationResponsePublic)
 async def get_reservation(
     reservation_id: UUID,
     guest_id: GuestIdDep,
     db: DbSession,
     redis: RedisDep,
     code: str | None = Query(None, description="Reservation code from confirmation; allows loading without cookie match"),
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """Get reservation by id. Allowed if it belongs to the current guest (cookie) or if code query param matches."""
     service = _reservation_service(db, redis)
     reservation = None
@@ -120,13 +120,13 @@ async def get_reservation(
     return reservation
 
 
-@router.get("/{reservation_id}/confirm", response_model=ReservationResponse)
+@router.get("/{reservation_id}/confirm", response_model=ReservationResponsePublic)
 async def confirm_reservation(
     reservation_id: UUID,
     db: DbSession,
     redis: RedisDep,
     token: str = Query(..., description="Confirmation token from email"),
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """Confirm a reservation via email confirmation link."""
     service = _reservation_service(db, redis)
     try:
@@ -138,13 +138,13 @@ async def confirm_reservation(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{reservation_id}/cancel", response_model=ReservationResponse)
+@router.get("/{reservation_id}/cancel", response_model=ReservationResponsePublic)
 async def cancel_reservation(
     reservation_id: UUID,
     db: DbSession,
     redis: RedisDep,
     token: str = Query(..., description="Cancellation token from email"),
-) -> ReservationResponse:
+) -> ReservationResponsePublic:
     """Cancel a reservation via email cancellation link."""
     service = _reservation_service(db, redis)
     try:

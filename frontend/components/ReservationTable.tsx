@@ -11,6 +11,7 @@ interface ReservationTableProps {
   reservations: ReservationResponse[];
   onStatusUpdate: (id: string, status: ReservationStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onViewDetails?: (reservation: ReservationResponse) => void;
   isLoading?: boolean;
 }
 
@@ -18,6 +19,7 @@ export function ReservationTable({
   reservations,
   onStatusUpdate,
   onDelete,
+  onViewDetails,
   isLoading = false,
 }: ReservationTableProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -148,14 +150,25 @@ export function ReservationTable({
                 />
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(reservation.id)}
-                  isLoading={deletingId === reservation.id}
-                >
-                  Delete
-                </Button>
+                <div className="flex items-center justify-end gap-2">
+                  {onViewDetails && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onViewDetails(reservation)}
+                    >
+                      View
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(reservation.id)}
+                    isLoading={deletingId === reservation.id}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}

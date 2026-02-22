@@ -39,8 +39,8 @@ class ReservationUpdate(BaseModel):
     notes: str | None = None
 
 
-class ReservationResponse(BaseModel):
-    """Reservation response schema. guest_id is not exposed."""
+class ReservationResponsePublic(BaseModel):
+    """Reservation response for public API (no qr_code; admin-only)."""
 
     id: UUID
     branch_id: UUID
@@ -54,6 +54,28 @@ class ReservationResponse(BaseModel):
     status: ReservationStatus
     notes: str | None
     reservation_code: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReservationResponse(BaseModel):
+    """Reservation response for admin (includes qr_code for staff to scan)."""
+
+    id: UUID
+    branch_id: UUID
+    table_id: UUID
+    full_name: str
+    phone_number: str
+    email: str | None
+    reservation_date: date
+    start_time: time
+    end_time: time
+    status: ReservationStatus
+    notes: str | None
+    reservation_code: str | None = None
+    qr_code: str | None = None  # base64-encoded PNG; admin scans to view reservation
     created_at: datetime
     updated_at: datetime
 

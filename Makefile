@@ -4,7 +4,7 @@
 	run-tests run-tests-coverage quick-test tests tests-coverage \
 	lint lint-fix format \
 	shell python-shell \
-	populate \
+	populate populate-local \
 	generate-ssl run-https stop-https restart-nginx nginx-logs nginx-config-test
 
 # Default target
@@ -205,10 +205,15 @@ python-shell:
 # Data Targets
 # ============================================================================
 
-## Populate database with initial data (builds api image first so code/deps are current)
+## Populate database with initial data (uses DB from docker-compose, runs in container)
 populate:
-	@echo "Populating database..."
+	@echo "Populating database (Docker, local DB)..."
 	@$(COMPOSE) -f $(COMPOSE_FILE) run --rm $(API_SERVICE) python $(POPULATE_SCRIPT)
+
+## Populate database using .env (e.g. remote server DB); run from project root with deps installed
+populate-local:
+	@echo "Populating database using .env (DATABASE_URL from .env)..."
+	@python $(POPULATE_SCRIPT)
 
 # ============================================================================
 # HTTPS / Nginx Targets
@@ -296,7 +301,8 @@ help:
 	@echo "  python-shell        - Open Python shell in API container"
 	@echo ""
 	@echo "Data:"
-	@echo "  populate            - Populate database with initial data"
+	@echo "  populate            - Populate database (Docker, local DB)"
+	@echo "  populate-local      - Populate database using .env (e.g. remote DB from host)"
 	@echo ""
 	@echo "HTTPS / Nginx:"
 	@echo "  generate-ssl        - Generate self-signed SSL certificates"
@@ -314,4 +320,5 @@ help:
 	@echo "  make run                     - Start services"
 	@echo "  make migrate-revision MESSAGE='add users table' - Create migration"
 	@echo "  make tests                   - Run full test suite"
-	@echo "  make populate                - Populate database"
+	@echo "  make populate                - Populate DB (Docker)"
+	@echo "  make populate-local          - Populate DB from .env (e.g. server DB)"

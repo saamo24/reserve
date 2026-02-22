@@ -51,7 +51,7 @@ uvicorn app.main:app --reload
 
 ## Deploying to Render
 
-- **Backend (Docker):** Use the root `Dockerfile`. To seed the DB on first deploy, set env `RUN_POPULATE=1` (or `RUN_POPULATE=true`) on the API service; the entrypoint will run migrations then `python scripts/seed.py` before starting the server. Remove the var after the first run to avoid re-running seed on every deploy. Alternatively run a one-off with the same image and start command: `./scripts/run-populate.sh` (migrations + seed then exit).
+- **Backend (Docker):** Use the root `Dockerfile`. The entrypoint runs migrations then `python scripts/seed.py` (populate) on every container start before starting the server. The seed script is idempotent (skips if data already exists). For a one-off run use: `./scripts/run-populate.sh` (migrations + seed then exit).
 - **Frontend:** Set `NEXT_PUBLIC_API_URL` to your backend URL (e.g. `https://your-api.onrender.com`) and redeploy so the build uses it; otherwise the app will call `localhost:8000` and you’ll see `ERR_CONNECTION_REFUSED`.
 
 ## Scaling Notes
@@ -138,7 +138,7 @@ curl -s http://localhost:8000/admin/dashboard/stats \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-**First admin:** Run `make seed` (or `python scripts/seed.py`) after migrations to create a default admin user (email: `admin@example.com`, password: `admin123` by default, configurable via `ADMIN_EMAIL` and `ADMIN_TEMP_PASSWORD` env vars). Change the password in production.
+**First admin:** When using Docker, the entrypoint runs the seed script at startup, which creates the default admin if missing. Otherwise run `make seed` (or `python scripts/seed.py`) after migrations. Default: email `admin@example.com`, password `admin123` (configurable via `ADMIN_EMAIL` and `ADMIN_TEMP_PASSWORD`). Change the password in production.
 
 ## Response Format
 
