@@ -1,5 +1,6 @@
 """Reservation business logic: create, get, list, update with locking and cache invalidation."""
 
+import asyncio
 import secrets
 from datetime import date, time, timedelta
 from uuid import UUID
@@ -136,17 +137,18 @@ class ReservationService:
             if reservation_with_relations is None:
                 reservation_with_relations = reservation
 
-            # Send emails (non-blocking, errors logged but don't fail reservation)
+            # Send emails in background so HTTP response is not blocked by SMTP timeouts
             email_service = EmailService()
-            try:
-                # Send confirmation email to user if email provided
-                if body.email:
-                    await email_service.send_reservation_confirmation(reservation_with_relations)
-                # Always send admin notification
-                await email_service.send_admin_notification(reservation_with_relations)
-            except Exception:
-                # Log but don't fail - email is not critical for reservation creation
-                pass
+
+            async def _send_creation_emails() -> None:
+                try:
+                    if body.email:
+                        await email_service.send_reservation_confirmation(reservation_with_relations)
+                    await email_service.send_admin_notification(reservation_with_relations)
+                except Exception:
+                    pass  # Errors already logged in email_service
+
+            asyncio.create_task(_send_creation_emails())
 
             return reservation_with_relations
         except IntegrityError:
@@ -268,12 +270,9 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Send status update email
+        # Send status update email in background (don't block response on SMTP)
         email_service = EmailService()
-        try:
-            await email_service.send_reservation_status_update(reservation, old_status)
-        except Exception:
-            pass
+        asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
 
         return reservation
 
@@ -304,12 +303,9 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Send status update email
+        # Send status update email in background (don't block response on SMTP)
         email_service = EmailService()
-        try:
-            await email_service.send_reservation_status_update(reservation, old_status)
-        except Exception:
-            pass
+        asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
 
         return reservation
 
@@ -357,14 +353,10 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Send status update email if status changed
+        # Send status update email in background if status changed (don't block on SMTP)
         if body.status is not None and body.status != old_status:
             email_service = EmailService()
-            try:
-                await email_service.send_reservation_status_update(reservation, old_status)
-            except Exception:
-                # Log but don't fail - email is not critical
-                pass
+            asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
 
         return reservation
 

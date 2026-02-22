@@ -64,9 +64,10 @@ class EmailService:
                 hostname=self.settings.smtp_host,
                 port=self.settings.smtp_port,
                 use_tls=use_ssl,
+                timeout=self.settings.smtp_timeout,
             )
             
-            await smtp.connect()
+            await smtp.connect(timeout=self.settings.smtp_timeout)
             
             # For port 587 with TLS enabled, upgrade connection with STARTTLS
             # Only if not already using SSL/TLS
