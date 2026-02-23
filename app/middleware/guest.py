@@ -27,36 +27,35 @@ class GuestMiddleware(BaseHTTPMiddleware):
         settings = get_settings()
         cookie_value = request.cookies.get(GUEST_COOKIE_NAME)
         guest_id = None
-        set_cookie_value: str | None = None
 
         if cookie_value:
             guest_id = verify_guest_id(cookie_value)
             if guest_id is None:
                 logger.warning("Invalid guest_id cookie signature")
-                # Fall through to generate new id and set cookie
+                # Fall through to generate new id
                 guest_id = None
 
         if guest_id is None:
             guest_id = uuid4()
-            set_cookie_value = sign_guest_id(guest_id)
 
         request.state.guest_id = guest_id
-        if set_cookie_value is not None:
-            request.state._set_guest_cookie = set_cookie_value
+        # Always sign the guest_id so we can set the cookie with correct attributes
+        signed_cookie_value = sign_guest_id(guest_id)
 
         response = await call_next(request)
 
-        if getattr(request.state, "_set_guest_cookie", None):
-            # In development, use SameSite=None and Secure=True so the cookie is sent
-            # on cross-origin requests (e.g. frontend localhost:3000 -> API localhost:8000).
-            is_dev = settings.app_env == "development"
-            response.set_cookie(
-                key=GUEST_COOKIE_NAME,
-                value=request.state._set_guest_cookie,
-                max_age=settings.guest_cookie_max_age,
-                secure=True if is_dev else settings.guest_cookie_secure,
-                httponly=True,
-                samesite="none" if is_dev else "lax",
-                path="/",
-            )
+        # Always set the cookie on every response to ensure it has the correct attributes
+        # (SameSite=None, Secure=True). This updates any existing cookies that were set
+        # with old attributes (e.g., SameSite=Lax), which is critical for Safari on iPhone.
+        # Note: Using lowercase "none" as required by Starlette/HTTP standard.
+        # Do NOT set domain attribute - it interferes with cross-site cookie behavior.
+        response.set_cookie(
+            key=GUEST_COOKIE_NAME,
+            value=signed_cookie_value,
+            max_age=settings.guest_cookie_max_age,
+            secure=True,
+            httponly=True,
+            samesite="none",  # lowercase "none" required for SameSite=None
+            path="/",
+        )
         return response
