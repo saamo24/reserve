@@ -113,12 +113,24 @@ export default function ReservationPage() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setContainerSize({ width: el.offsetWidth || 600, height: el.offsetHeight || 400 });
-    });
+    const updateSize = () => {
+      // Get the available width (accounting for padding)
+      const availableWidth = el.offsetWidth || window.innerWidth - 48; // 48px for padding
+      const availableHeight = 400; // Base height, will be constrained by max-height in CSS
+      setContainerSize({ 
+        width: Math.max(availableWidth, 400), 
+        height: Math.max(availableHeight, 300) 
+      });
+    };
+    const ro = new ResizeObserver(updateSize);
     ro.observe(el);
-    setContainerSize({ width: el.offsetWidth || 600, height: el.offsetHeight || 400 });
-    return () => ro.disconnect();
+    updateSize();
+    // Also listen to window resize for mobile orientation changes
+    window.addEventListener('resize', updateSize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, [hasLayout]);
 
   const handleSelectTable = (id: string | null, table: LayoutTable | null) => {
@@ -155,7 +167,7 @@ export default function ReservationPage() {
       <>
         <Navbar />
         <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12">
             <ReservationForm
               branch={branch}
               table={tableForForm}
@@ -176,23 +188,23 @@ export default function ReservationPage() {
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <Card variant="elevated" className="mb-8">
-            <CardContent className="p-6">
-              <h1 className="text-3xl font-bold text-secondary-900 mb-2">{branch.name}</h1>
-              <p className="text-secondary-600 mb-4">{branch.address}</p>
-              <div className="flex items-center gap-4 text-sm text-secondary-500">
+          <Card variant="elevated" className="mb-6 sm:mb-8">
+            <CardContent className="p-4 sm:p-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-secondary-900 mb-2">{branch.name}</h1>
+              <p className="text-sm sm:text-base text-secondary-600 mb-3 sm:mb-4">{branch.address}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-secondary-500">
                 <span>
                   Hours: {branch.opening_time.substring(0, 5)} – {branch.closing_time.substring(0, 5)}
                 </span>
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium self-start sm:self-auto">
                   Open
                 </span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="mb-6">
-            <CardContent className="p-6 space-y-4">
+          <Card className="mb-4 sm:mb-6">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-1">Date</label>
                 <Input
@@ -215,7 +227,7 @@ export default function ReservationPage() {
                     const [start_time, end_time] = v.split('-');
                     setSelectedSlot({ start_time, end_time });
                   }}
-                  className="w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="">Select time</option>
                   {slots.map((s) => (
@@ -232,24 +244,27 @@ export default function ReservationPage() {
           </Card>
 
           {!selectedSlot ? (
-            <p className="text-secondary-600">Select date and time to choose a table.</p>
+            <p className="text-sm sm:text-base text-secondary-600">Select date and time to choose a table.</p>
           ) : hasLayout ? (
-            <div ref={containerRef} className="min-h-[400px]">
-              <UserTableSelector
-                branchId={branch.id}
-                date={date}
-                startTime={selectedSlot.start_time}
-                endTime={selectedSlot.end_time}
-                selectedTableId={selectedTableId}
-                onSelectTable={handleSelectTable}
-                containerWidth={containerSize.width}
-                containerHeight={containerSize.height}
-              />
+            <div>
+              <div ref={containerRef} className="w-full" style={{ minHeight: '300px' }}>
+                <UserTableSelector
+                  branchId={branch.id}
+                  date={date}
+                  startTime={selectedSlot.start_time}
+                  endTime={selectedSlot.end_time}
+                  selectedTableId={selectedTableId}
+                  onSelectTable={handleSelectTable}
+                  containerWidth={containerSize.width}
+                  containerHeight={containerSize.height}
+                />
+              </div>
               <div className="mt-4 flex justify-end">
                 <Button
                   variant="primary"
                   onClick={handleContinueWithTable}
                   disabled={!selectedTableId}
+                  className="w-full sm:w-auto"
                 >
                   Continue with selected table
                 </Button>

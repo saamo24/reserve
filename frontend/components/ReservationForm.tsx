@@ -328,15 +328,15 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
 
   return (
     <Card variant="elevated">
-      <CardHeader>
-        <CardTitle>Make a Reservation</CardTitle>
-        <div className="mt-2 p-3 bg-secondary-50 rounded-lg">
-          <p className="text-sm text-secondary-600">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Make a Reservation</CardTitle>
+        <div className="mt-2 p-3 sm:p-4 bg-secondary-50 rounded-lg">
+          <p className="text-xs sm:text-sm text-secondary-600">
             <span className="font-medium">Selected Table:</span> Table {table.table_number} ({table.capacity} guests, {table.location})
           </p>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
         <form 
           onSubmit={handleSubmit(
             onSubmit,
@@ -346,9 +346,9 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
               console.log('Current form values:', getValues());
             }
           )} 
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <Input
               label="Full Name"
               {...register('full_name')}
@@ -429,16 +429,17 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
             className="w-full"
           />
 
-          <div className="flex justify-between gap-4">
+          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={onBack || (() => router.push('/'))}
               disabled={isSubmitting}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               {onBack ? 'Back to Tables' : 'Cancel'}
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmitting}>
+            <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-auto order-1 sm:order-2">
               Book Reservation
             </Button>
           </div>

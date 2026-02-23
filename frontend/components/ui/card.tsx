@@ -14,7 +14,7 @@ export function Card({ children, className, variant = 'default', ...props }: Car
 
   return (
     <div
-      className={cn('rounded-xl p-6 transition-all duration-200', variants[variant], className)}
+      className={cn('rounded-xl p-4 sm:p-6 transition-all duration-200', variants[variant], className)}
       {...props}
     >
       {children}
@@ -24,7 +24,7 @@ export function Card({ children, className, variant = 'default', ...props }: Car
 
 export function CardHeader({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('mb-4', className)} {...props}>
+    <div className={cn('mb-3 sm:mb-4', className)} {...props}>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ export function CardTitle({
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h3 className={cn('text-xl font-semibold text-secondary-900', className)} {...props}>
+    <h3 className={cn('text-lg sm:text-xl font-semibold text-secondary-900', className)} {...props}>
       {children}
     </h3>
   );

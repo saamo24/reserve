@@ -132,25 +132,48 @@ export function UserTableSelector({
     );
   }
 
+  // Calculate a reasonable canvas size that shows the layout well
+  // Use the container size as base, but ensure it's at least as large as the layout
+  // Add some padding for better visibility
+  const padding = 40;
+  const minCanvasWidth = Math.max(layout.width + padding, 400);
+  const minCanvasHeight = Math.max(layout.height + padding, 300);
+  
+  // Use container size if it's larger, otherwise use calculated minimum
+  const canvasWidth = Math.max(containerWidth, minCanvasWidth);
+  const canvasHeight = Math.max(containerHeight, minCanvasHeight);
+  
+  // For mobile, use a reasonable viewport-relative max height with scrolling
+  const maxContainerHeight = '70vh';
+  
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Select a table</CardTitle>
-        <p className="text-sm text-secondary-600 mt-1">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Select a table</CardTitle>
+        <p className="text-xs sm:text-sm text-secondary-600 mt-1">
           Green: available · Red: reserved · Click a green table to select
         </p>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-lg border border-secondary-200 overflow-hidden bg-secondary-50">
-          <FloorCanvas
-            layout={layout}
-            mode="user"
-            selectedId={selectedTableId}
-            containerWidth={containerWidth}
-            containerHeight={containerHeight}
-            tableStatuses={tableStatuses}
-            onSelectTable={handleSelect}
-          />
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <div 
+          className="rounded-lg border border-secondary-200 overflow-auto bg-secondary-50" 
+          style={{ 
+            maxHeight: maxContainerHeight, 
+            minHeight: '300px',
+            width: '100%'
+          }}
+        >
+          <div style={{ width: canvasWidth, height: canvasHeight, position: 'relative' }}>
+            <FloorCanvas
+              layout={layout}
+              mode="user"
+              selectedId={selectedTableId}
+              containerWidth={canvasWidth}
+              containerHeight={canvasHeight}
+              tableStatuses={tableStatuses}
+              onSelectTable={handleSelect}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
