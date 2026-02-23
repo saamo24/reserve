@@ -44,11 +44,6 @@ class GuestMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # Always set the cookie on every response to ensure it has the correct attributes
-        # (SameSite=None, Secure=True). This updates any existing cookies that were set
-        # with old attributes (e.g., SameSite=Lax), which is critical for Safari on iPhone.
-        # Note: Using lowercase "none" as required by Starlette/HTTP standard.
-        # Do NOT set domain attribute - it interferes with cross-site cookie behavior.
         response.set_cookie(
             key=GUEST_COOKIE_NAME,
             value=signed_cookie_value,
