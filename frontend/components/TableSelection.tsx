@@ -52,7 +52,7 @@ export function TableSelection({ branch, onTableSelect }: TableSelectionProps) {
   if (isLoading) {
     return (
       <Card variant="elevated">
-        <CardContent className="p-12">
+        <CardContent className="p-6 sm:p-12">
           <div className="flex justify-center">
             <LoadingSpinner size="lg" />
           </div>
@@ -64,7 +64,7 @@ export function TableSelection({ branch, onTableSelect }: TableSelectionProps) {
   if (tables.length === 0) {
     return (
       <Card variant="elevated">
-        <CardContent className="p-12">
+        <CardContent className="p-6 sm:p-12">
           <EmptyState
             title="No tables available"
             description="There are currently no tables available for this branch. Please contact the restaurant directly."
@@ -76,33 +76,33 @@ export function TableSelection({ branch, onTableSelect }: TableSelectionProps) {
 
   return (
     <Card variant="elevated">
-      <CardHeader>
-        <CardTitle>Select a Table</CardTitle>
-        <p className="text-sm text-secondary-600 mt-2">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Select a Table</CardTitle>
+        <p className="text-xs sm:text-sm text-secondary-600 mt-2">
           Choose a table that suits your party size
         </p>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {tables.map((table) => (
             <button
               key={table.id}
               onClick={() => handleTableSelect(table)}
-              className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+              className={`p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                 selectedTable?.id === table.id
                   ? 'border-primary-600 bg-primary-50 shadow-md'
                   : 'border-secondary-200 bg-white hover:border-primary-300 hover:shadow-sm'
               }`}
             >
               <div className="flex items-start justify-between mb-2">
-                <h3 className="font-semibold text-lg text-secondary-900">
+                <h3 className="font-semibold text-base sm:text-lg text-secondary-900">
                   Table {table.table_number}
                 </h3>
                 {selectedTable?.id === table.id && (
-                  <span className="text-primary-600 text-xl">✓</span>
+                  <span className="text-primary-600 text-lg sm:text-xl">✓</span>
                 )}
               </div>
-              <div className="space-y-1 text-sm text-secondary-600">
+              <div className="space-y-1 text-xs sm:text-sm text-secondary-600">
                 <p>Capacity: {table.capacity} guests</p>
                 <p>Location: {table.location}</p>
               </div>
@@ -115,7 +115,7 @@ export function TableSelection({ branch, onTableSelect }: TableSelectionProps) {
             variant="primary"
             onClick={handleContinue}
             disabled={!selectedTable}
-            className="min-w-[120px]"
+            className="w-full sm:w-auto min-w-[120px]"
           >
             Continue
           </Button>
