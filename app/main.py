@@ -95,6 +95,7 @@ class SafariCORSFixMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+            response.headers["Access-Control-Expose-Headers"] = "X-Guest-Token"  # Allow frontend to read guest token
         return response
 
 
