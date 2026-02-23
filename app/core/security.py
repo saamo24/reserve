@@ -69,3 +69,37 @@ def decode_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+
+def create_guest_token(guest_id: UUID) -> str:
+    """Create a long-lived guest JWT token for cross-site scenarios (Safari ITP workaround)."""
+    settings = get_settings()
+    # Guest tokens last 30 days (same as cookie max_age default)
+    expire = datetime.now(timezone.utc) + timedelta(seconds=settings.guest_cookie_max_age)
+    payload = {
+        "sub": str(guest_id),
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "guest",
+    }
+    return jwt.encode(
+        payload,
+        _secret(),
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def decode_guest_token(token: str) -> UUID | None:
+    """Decode and validate a guest JWT token. Returns guest_id UUID or None if invalid."""
+    payload = decode_token(token)
+    if payload is None:
+        return None
+    if payload.get("type") != "guest":
+        return None
+    sub = payload.get("sub")
+    if not sub:
+        return None
+    try:
+        return UUID(sub)
+    except ValueError:
+        return None
