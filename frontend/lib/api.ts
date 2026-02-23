@@ -104,7 +104,9 @@ export async function createReservation(body: ReservationCreate): Promise<Reserv
 }
 
 export async function getReservationsMe(): Promise<ReservationResponse[]> {
-  const { data } = await api.get<ReservationResponse[]>('/reservations/me');
+  const { data } = await api.get<ReservationResponse[]>('/reservations/me', {
+    withCredentials: true,
+  });
   return data;
 }
 
