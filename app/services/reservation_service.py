@@ -75,16 +75,28 @@ class ReservationService:
             raise ValueError("Slot end time must be within branch working hours")
 
         table_id: UUID
+        table: Table | None = None
         if body.table_id is not None:
             table = await self._table_repo.get_by_id(body.table_id)
             if table is None or table.branch_id != branch.id or not table.is_active:
                 raise NotFoundError("Table not found or not in this branch")
             table_id = table.id
+            # Validate number of guests against table capacity
+            if body.number_of_guests > table.capacity:
+                raise ValueError(
+                    f"Number of guests ({body.number_of_guests}) exceeds table capacity ({table.capacity})"
+                )
         else:
-            # Auto-assign: find first free table for this slot
+            # Auto-assign: find first free table for this slot that can accommodate the guests
             tables = await self._table_repo.list_by_branch(branch.id, active_only=True)
+            # Filter tables by capacity first
+            suitable_tables = [t for t in tables if t.capacity >= body.number_of_guests]
+            if not suitable_tables:
+                raise ValueError(
+                    f"No table available that can accommodate {body.number_of_guests} guests"
+                )
             table_id = await self._pick_available_table(
-                tables, body.reservation_date, body.start_time, end_time
+                suitable_tables, body.reservation_date, body.start_time, end_time
             )
             if table_id is None:
                 raise ConflictError("No table available for this slot")

@@ -69,6 +69,7 @@ export interface ReservationCreate {
   full_name: string;
   phone_number: string;
   email?: string | null;
+  number_of_guests: number;
   notes?: string | null;
 }
 
