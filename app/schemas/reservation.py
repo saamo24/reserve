@@ -19,6 +19,7 @@ class ReservationCreate(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     phone_number: str = Field(..., min_length=1, max_length=32)
     email: EmailStr | None = None
+    number_of_guests: int = Field(..., ge=1, le=100)
     notes: str | None = None
 
     @field_validator("phone_number")

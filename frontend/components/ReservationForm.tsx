@@ -320,6 +320,7 @@ export function ReservationForm({ branch, table, onBack, initialDate, initialTim
         full_name: data.full_name,
         phone_number: data.phone_number,
         email: data.email && data.email !== '' ? data.email : null,
+        number_of_guests: data.number_of_guests,
         notes: data.notes || null,
       };
 
