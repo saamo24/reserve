@@ -10,7 +10,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.reservation_repository import ReservationRepository
 from app.repositories.table_repository import TableRepository
 from app.schemas.branch import BranchResponse
-from app.schemas.layout import LayoutPayload, layout_from_dict
+from app.schemas.layout import LayoutDocument, layout_from_dict_any
 from app.schemas.table import TableResponse
 from app.services.caching_service import CachingService
 from app.services.timeslot_service import TimeslotService
@@ -60,14 +60,14 @@ async def list_tables(branch_id: UUID, db: DbSession) -> list:
     return tables
 
 
-@router.get("/{branch_id}/layout", response_model=LayoutPayload)
-async def get_layout(branch_id: UUID, db: DbSession) -> LayoutPayload:
-    """Get floor plan layout for a branch (read-only). Returns empty layout if none."""
+@router.get("/{branch_id}/layout")
+async def get_layout(branch_id: UUID, db: DbSession) -> LayoutDocument:
+    """Get floor plan layout for a branch (read-only, v1 or v2). Returns empty v1 layout if none."""
     repo = BranchRepository(db)
     branch = await repo.get_by_id(branch_id)
     if branch is None:
         raise HTTPException(status_code=404, detail="Branch not found")
-    return layout_from_dict(branch.layout_json)
+    return layout_from_dict_any(branch.layout_json)
 
 
 @router.get("/{branch_id}/reserved-tables")

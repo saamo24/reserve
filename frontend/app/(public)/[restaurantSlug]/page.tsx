@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { getBranches, getBranch, getSlots, getLayoutPublic } from '@/lib/api';
 import type { BranchResponse, LayoutTable, Slot, TableResponse } from '@/lib/types';
 import { createSlugToBranchMap, getBranchIdFromSlug, getTodayDate } from '@/lib/utils';
+import { layoutHasTables } from '@/lib/types';
 import { Navbar } from '@/components/Navbar';
 import { ReservationForm } from '@/components/ReservationForm';
 import { TableSelection } from '@/components/TableSelection';
@@ -15,10 +16,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 
-const UserTableSelector = dynamic(
+const UserLayoutViewer = dynamic(
   () =>
-    import('@/components/floor/UserTableSelector').then((m) => ({
-      default: m.UserTableSelector,
+    import('@/components/layout/UserLayoutViewer').then((m) => ({
+      default: m.UserLayoutViewer,
     })),
   { ssr: false }
 );
@@ -52,6 +53,8 @@ export default function ReservationPage() {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [selectedLayoutTable, setSelectedLayoutTable] = useState<LayoutTable | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [confirmedTable, setConfirmedTable] = useState(false);
   const [hasLayout, setHasLayout] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 600, height: 400 });
@@ -81,7 +84,7 @@ export default function ReservationPage() {
         setBranch(branchData);
         try {
           const layout = await getLayoutPublic(branchId);
-          setHasLayout(layout.tables.length > 0);
+          setHasLayout(layoutHasTables(layout));
         } catch {
           setHasLayout(false);
         }
@@ -107,6 +110,8 @@ export default function ReservationPage() {
     setSelectedSlot(null);
     setSelectedTableId(null);
     setSelectedLayoutTable(null);
+    setSelectedZoneId(null);
+    setSelectedFloorId(null);
     setConfirmedTable(false);
   }, [branch, date]);
 
@@ -133,9 +138,16 @@ export default function ReservationPage() {
     };
   }, [hasLayout]);
 
-  const handleSelectTable = (id: string | null, table: LayoutTable | null) => {
+  const handleSelectTable = (
+    id: string | null,
+    table: LayoutTable | null,
+    zoneId: string | null,
+    floorId: string | null
+  ) => {
     setSelectedTableId(id);
     setSelectedLayoutTable(table);
+    setSelectedZoneId(zoneId);
+    setSelectedFloorId(floorId);
   };
 
   const handleContinueWithTable = () => {
@@ -171,9 +183,13 @@ export default function ReservationPage() {
             <ReservationForm
               branch={branch}
               table={tableForForm}
+              initialDate={date}
+              initialTime={selectedSlot?.start_time}
               onBack={() => {
                 setSelectedTableId(null);
                 setSelectedLayoutTable(null);
+                setSelectedZoneId(null);
+                setSelectedFloorId(null);
                 setConfirmedTable(false);
               }}
             />
@@ -248,7 +264,7 @@ export default function ReservationPage() {
           ) : hasLayout ? (
             <div>
               <div ref={containerRef} className="w-full" style={{ minHeight: '300px' }}>
-                <UserTableSelector
+                <UserLayoutViewer
                   branchId={branch.id}
                   date={date}
                   startTime={selectedSlot.start_time}

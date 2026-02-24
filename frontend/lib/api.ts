@@ -12,6 +12,7 @@ import type {
   PaginatedResponse,
   DashboardStats,
   Layout,
+  LayoutDocument,
 } from './types';
 import type { Slot } from './types';
 
@@ -112,8 +113,8 @@ export async function getBranchTables(branchId: string): Promise<TableResponse[]
   return data;
 }
 
-export async function getLayoutPublic(branchId: string): Promise<Layout> {
-  const { data } = await api.get<Layout>(`/branches/${branchId}/layout`);
+export async function getLayoutPublic(branchId: string): Promise<LayoutDocument> {
+  const { data } = await api.get<LayoutDocument>(`/branches/${branchId}/layout`);
   return data;
 }
 
@@ -287,12 +288,12 @@ export async function getDashboardStats(params?: {
   return data;
 }
 
-export async function getLayout(branchId: string): Promise<Layout> {
-  const { data } = await api.get<Layout>(`/admin/branches/${branchId}/layout`);
+export async function getLayout(branchId: string): Promise<LayoutDocument> {
+  const { data } = await api.get<LayoutDocument>(`/admin/branches/${branchId}/layout`);
   return data;
 }
 
-export async function saveLayout(branchId: string, layout: Layout): Promise<Layout> {
-  const { data } = await api.put<Layout>(`/admin/branches/${branchId}/layout`, layout);
+export async function saveLayout(branchId: string, layout: LayoutDocument): Promise<LayoutDocument> {
+  const { data } = await api.put<LayoutDocument>(`/admin/branches/${branchId}/layout`, layout);
   return data;
 }

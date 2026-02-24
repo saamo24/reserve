@@ -4,22 +4,22 @@ import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { listBranches } from '@/lib/api';
 import type { BranchResponse } from '@/lib/types';
-import { useFloorEditorStore } from '@/stores/floorEditorStore';
+import { useLayoutBuilderStore } from '@/stores/layoutBuilderStore';
 import { LoadingSpinner } from '@/components/ui/loading';
 import toast from 'react-hot-toast';
 
-const FloorEditorView = dynamic(
+const LayoutManager = dynamic(
   () =>
-    import('@/components/floor/FloorEditorView').then((m) => ({ default: m.FloorEditorView })),
+    import('@/components/layout/LayoutManager').then((m) => ({ default: m.LayoutManager })),
   { ssr: false }
 );
 
 export default function AdminLayoutPage() {
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const branchId = useFloorEditorStore((s) => s.branchId);
-  const setBranchId = useFloorEditorStore((s) => s.setBranchId);
-  const loadLayout = useFloorEditorStore((s) => s.loadLayout);
+  const branchId = useLayoutBuilderStore((s) => s.branchId);
+  const setBranchId = useLayoutBuilderStore((s) => s.setBranchId);
+  const loadLayout = useLayoutBuilderStore((s) => s.loadLayout);
 
   useEffect(() => {
     listBranches({ page_size: 100 })
@@ -48,11 +48,11 @@ export default function AdminLayoutPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full flex flex-col">
       <div>
         <h1 className="text-2xl font-bold text-secondary-900">Floor plan layout</h1>
         <p className="text-secondary-600 mt-1">
-          Drag, resize, and rotate tables. Save to store the layout for this branch.
+          Create zones, add floors, and place tables. Drag, resize, and rotate tables. Save to store the layout.
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -71,8 +71,8 @@ export default function AdminLayoutPage() {
         </select>
       </div>
       {branchId ? (
-        <div className="border border-secondary-200 rounded-xl overflow-hidden bg-white h-[640px] flex flex-col">
-          <FloorEditorView />
+        <div className="border border-secondary-200 rounded-xl overflow-hidden bg-white flex-1 min-h-[640px] flex flex-col">
+          <LayoutManager />
         </div>
       ) : (
         <div className="border border-secondary-200 rounded-xl bg-secondary-50 min-h-[400px] flex items-center justify-center text-secondary-600">
