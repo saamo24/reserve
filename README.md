@@ -116,7 +116,6 @@ curl -s -X POST http://localhost:8000/admin/branches \
   -d '{
     "name": "Downtown",
     "address": "456 Main St",
-    "timezone": "America/New_York",
     "opening_time": "11:00:00",
     "closing_time": "23:00:00",
     "slot_duration_minutes": 120,

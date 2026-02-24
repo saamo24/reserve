@@ -19,7 +19,7 @@ from app.services.caching_service import CachingService
 from app.services.email_service import EmailService
 from app.services.locking_service import LockingService
 from app.services.timeslot_service import TimeslotService
-from app.utils.validators import get_now_in_timezone, time_in_range
+from app.utils.validators import time_in_range
 
 
 def _generate_reservation_code() -> str:
