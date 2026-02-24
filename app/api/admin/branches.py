@@ -46,7 +46,6 @@ async def create_branch(
     branch = Branch(
         name=body.name,
         address=body.address,
-        timezone=body.timezone,
         opening_time=body.opening_time,
         closing_time=body.closing_time,
         slot_duration_minutes=body.slot_duration_minutes,

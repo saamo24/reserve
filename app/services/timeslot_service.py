@@ -2,7 +2,6 @@
 
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,11 +41,6 @@ def _generate_slot_boundaries(
     return slots
 
 
-def _now_in_timezone(tz_name: str) -> datetime:
-    """Current datetime in branch timezone."""
-    return datetime.now(ZoneInfo(tz_name))
-
-
 class TimeslotService:
     """Compute available time slots for a branch on a date."""
 
@@ -80,10 +74,9 @@ class TimeslotService:
         opening = branch.opening_time
         closing = branch.closing_time
         duration = branch.slot_duration_minutes
-        tz_name = branch.timezone
 
         boundaries = _generate_slot_boundaries(opening, closing, duration)
-        now_dt = _now_in_timezone(tz_name)
+        now_dt = datetime.now()
         today_local = now_dt.date()
 
         # Past date

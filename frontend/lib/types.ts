@@ -19,7 +19,6 @@ export interface BranchResponse {
   id: string;
   name: string;
   address: string;
-  timezone: string;
   opening_time: string;
   closing_time: string;
   slot_duration_minutes: number;
@@ -76,7 +75,6 @@ export interface ReservationCreate {
 export interface BranchCreate {
   name: string;
   address: string;
-  timezone?: string;
   opening_time: string;
   closing_time: string;
   slot_duration_minutes?: number;
@@ -86,7 +84,6 @@ export interface BranchCreate {
 export interface BranchUpdate {
   name?: string;
   address?: string;
-  timezone?: string;
   opening_time?: string;
   closing_time?: string;
   slot_duration_minutes?: number;
