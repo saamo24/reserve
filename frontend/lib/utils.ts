@@ -1,4 +1,5 @@
-import type { BranchResponse } from './types';
+import type { BranchResponse, LayoutDocument, LayoutV2, LayoutZone, LayoutFloor } from './types';
+import { isLayoutV1, isLayoutV2 } from './types';
 
 /** Merge class names. */
 export function cn(...inputs: (string | undefined | null | false)[]): string {
@@ -73,4 +74,31 @@ export function getBranchIdFromSlug(
 ): string | null {
   const branch = slugMap.get(slug);
   return branch ? branch.id : null;
+}
+
+/** Normalize layout (v1 or v2) to v2 format for UI consistency. */
+export function normalizeLayoutToV2(layout: LayoutDocument): LayoutV2 {
+  if (isLayoutV2(layout)) {
+    return layout;
+  }
+  
+  // Convert v1 to v2: create a single "Indoor" zone with one floor
+  const defaultZone: LayoutZone = {
+    id: 'default-indoor-zone',
+    name: 'Indoor',
+    type: 'indoor',
+    floors: [
+      {
+        id: 'default-floor-1',
+        name: 'Floor 1',
+        width: layout.width,
+        height: layout.height,
+        tables: layout.tables,
+      },
+    ],
+  };
+  
+  return {
+    zones: [defaultZone],
+  };
 }

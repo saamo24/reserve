@@ -2,7 +2,9 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { getLayoutPublic, getReservedTableIds, getBranchTables } from '@/lib/api';
-import type { Layout, TableStatus } from '@/lib/types';
+import type { Layout, LayoutDocument, LayoutTable, TableStatus } from '@/lib/types';
+import { isLayoutV1 } from '@/lib/types';
+import { normalizeLayoutToV2 } from '@/lib/utils';
 import { FloorCanvas } from './FloorCanvas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading';
@@ -52,7 +54,30 @@ export function UserTableSelector({
     ])
       .then(([layoutData, reserved, tables]) => {
         if (cancelled) return;
-        setLayout(layoutData);
+        // Normalize to v1 for backward compatibility with old FloorCanvas
+        let layoutV1: Layout;
+        if (isLayoutV1(layoutData)) {
+          layoutV1 = layoutData;
+        } else {
+          // Extract all tables from v2 layout
+          const v2 = normalizeLayoutToV2(layoutData);
+          const allTables: LayoutTable[] = [];
+          for (const zone of v2.zones) {
+            if (zone.type === 'outdoor' && zone.tables) {
+              allTables.push(...zone.tables);
+            } else if (zone.type === 'indoor' && zone.floors) {
+              for (const floor of zone.floors) {
+                allTables.push(...floor.tables);
+              }
+            }
+          }
+          layoutV1 = {
+            width: 800,
+            height: 600,
+            tables: allTables,
+          };
+        }
+        setLayout(layoutV1);
         setReservedIds(new Set(reserved));
         setActiveTableIds(new Set(tables.map((t) => t.id)));
       })

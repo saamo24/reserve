@@ -132,6 +132,7 @@ export interface DashboardStats {
 
 // Floor plan layout (matches backend layout JSON)
 export type LayoutTableShape = 'round' | 'rect';
+export type ZoneType = 'indoor' | 'outdoor';
 
 export interface LayoutTable {
   id: string;
@@ -145,10 +146,72 @@ export interface LayoutTable {
   table_number: string;
 }
 
-export interface Layout {
+// Layout V1 (legacy: single canvas)
+export interface LayoutV1 {
   width: number;
   height: number;
   tables: LayoutTable[];
 }
+
+// Layout V2 (zones/floors)
+export interface LayoutFloor {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  tables: LayoutTable[];
+}
+
+export interface LayoutZone {
+  id: string;
+  name: string;
+  type: ZoneType;
+  // Indoor: floors required
+  floors?: LayoutFloor[];
+  // Outdoor: width/height/tables required
+  width?: number;
+  height?: number;
+  tables?: LayoutTable[];
+}
+
+export interface LayoutV2 {
+  zones: LayoutZone[];
+}
+
+// Union type for layout documents
+export type LayoutDocument = LayoutV1 | LayoutV2;
+
+// Type guard helpers
+export function isLayoutV1(layout: LayoutDocument): layout is LayoutV1 {
+  return 'width' in layout && 'height' in layout && 'tables' in layout && !('zones' in layout);
+}
+
+export function isLayoutV2(layout: LayoutDocument): layout is LayoutV2 {
+  return 'zones' in layout;
+}
+
+// Helper to check if layout has any tables
+export function layoutHasTables(layout: LayoutDocument): boolean {
+  if (isLayoutV1(layout)) {
+    return layout.tables.length > 0;
+  }
+  // V2: check all zones
+  for (const zone of layout.zones) {
+    if (zone.type === 'outdoor' && zone.tables && zone.tables.length > 0) {
+      return true;
+    }
+    if (zone.type === 'indoor' && zone.floors) {
+      for (const floor of zone.floors) {
+        if (floor.tables.length > 0) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Backward compatibility alias
+export type Layout = LayoutV1;
 
 export type TableStatus = 'available' | 'reserved' | 'disabled';
