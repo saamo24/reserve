@@ -128,6 +128,11 @@ export async function getReservedTableIds(
   return data;
 }
 
+export async function getTimezones(): Promise<string[]> {
+  const { data } = await api.get<string[]>('/timezones');
+  return data;
+}
+
 export async function createReservation(body: ReservationCreate): Promise<ReservationResponse> {
   const { data } = await api.post<ReservationResponse>('/reservations', body);
   return data;

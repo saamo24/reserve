@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { listBranches, createBranch, updateBranch } from '@/lib/api';
+import { listBranches, createBranch, updateBranch, getTimezones } from '@/lib/api';
 import { BranchResponse, BranchCreate, BranchUpdate } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { LoadingPage } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -15,6 +16,7 @@ export default function BranchesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<BranchResponse | null>(null);
+  const [timezones, setTimezones] = useState<string[]>([]);
   const [formData, setFormData] = useState<BranchCreate>({
     name: '',
     address: '',
@@ -27,7 +29,19 @@ export default function BranchesPage() {
 
   useEffect(() => {
     fetchBranches();
+    fetchTimezones();
   }, []);
+
+  async function fetchTimezones() {
+    try {
+      const tz = await getTimezones();
+      setTimezones(tz);
+    } catch (err) {
+      console.error('Failed to load timezones:', err);
+      // Fallback to common timezones if API fails
+      setTimezones(['UTC', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Europe/London', 'Asia/Yerevan']);
+    }
+  }
 
   async function fetchBranches() {
     try {
@@ -180,11 +194,12 @@ export default function BranchesPage() {
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   required
                 />
-                <Input
+                <Select
                   label="Timezone"
                   value={formData.timezone}
                   onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                  placeholder="America/New_York"
+                  options={timezones.map((tz) => ({ value: tz, label: tz }))}
+                  required
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <Input
