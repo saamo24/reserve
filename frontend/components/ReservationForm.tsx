@@ -116,9 +116,13 @@ interface ReservationFormProps {
   branch: BranchResponse;
   table: TableResponse;
   onBack?: () => void;
+  /** Pre-selected date (YYYY-MM-DD) - if provided, date field will be read-only */
+  initialDate?: string;
+  /** Pre-selected time (HH:MM) - if provided, time field will be read-only */
+  initialTime?: string;
 }
 
-export function ReservationForm({ branch, table, onBack }: ReservationFormProps) {
+export function ReservationForm({ branch, table, onBack, initialDate, initialTime }: ReservationFormProps) {
   const router = useRouter();
   const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
@@ -142,8 +146,8 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
       phone_number: '',
       email: '',
       number_of_guests: Math.min(2, table.capacity),
-      reservation_date: getTodayDate(),
-      start_time: '',
+      reservation_date: initialDate || getTodayDate(),
+      start_time: initialTime || '',
       notes: '',
     },
   });
@@ -165,14 +169,31 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
     }
   }, [isSubmitted, errors, getValues]);
 
-  // Fetch slots when date changes or on mount
+  // Set initial values if provided
   useEffect(() => {
+    if (initialDate) {
+      setValue('reservation_date', initialDate);
+    }
+    if (initialTime) {
+      setValue('start_time', initialTime);
+    }
+  }, [initialDate, initialTime, setValue]);
+
+  // Fetch slots when date changes or on mount (only if date/time not pre-selected)
+  useEffect(() => {
+    // Skip slot fetching if date and time are already provided
+    if (initialDate && initialTime) {
+      return;
+    }
+
     const executionId = ++executionRef.current;
     let isCancelled = false;
 
     async function fetchSlots() {
       if (!selectedDate) {
-        setValue('start_time', '');
+        if (!initialTime) {
+          setValue('start_time', '');
+        }
         return;
       }
 
@@ -299,6 +320,7 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
         full_name: data.full_name,
         phone_number: data.phone_number,
         email: data.email && data.email !== '' ? data.email : null,
+        number_of_guests: data.number_of_guests,
         notes: data.notes || null,
       };
 
@@ -328,15 +350,20 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
 
   return (
     <Card variant="elevated">
-      <CardHeader>
-        <CardTitle>Make a Reservation</CardTitle>
-        <div className="mt-2 p-3 bg-secondary-50 rounded-lg">
-          <p className="text-sm text-secondary-600">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Make a Reservation</CardTitle>
+        <div className="mt-2 p-3 sm:p-4 bg-secondary-50 rounded-lg space-y-1">
+          <p className="text-xs sm:text-sm text-secondary-600">
             <span className="font-medium">Selected Table:</span> Table {table.table_number} ({table.capacity} guests, {table.location})
           </p>
+          {initialDate && initialTime && (
+            <p className="text-xs sm:text-sm text-secondary-600">
+              <span className="font-medium">Date & Time:</span> {new Date(initialDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {initialTime}
+            </p>
+          )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
         <form 
           onSubmit={handleSubmit(
             onSubmit,
@@ -346,9 +373,17 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
               console.log('Current form values:', getValues());
             }
           )} 
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Hidden fields for date and time - already selected */}
+          {initialDate && (
+            <input type="hidden" {...register('reservation_date')} value={initialDate} />
+          )}
+          {initialTime && (
+            <input type="hidden" {...register('start_time')} value={initialTime} />
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <Input
               label="Full Name"
               {...register('full_name')}
@@ -382,43 +417,6 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
               max={table.capacity}
               required
             />
-
-            <Input
-              label="Date"
-              type="date"
-              {...register('reservation_date')}
-              error={isSubmitted ? errors.reservation_date?.message : undefined}
-              min={minDate}
-              required
-            />
-
-            <div className="w-full">
-              <Select
-                label="Time"
-                {...register('start_time')}
-                error={isSubmitted ? errors.start_time?.message : undefined}
-                options={
-                  isLoadingSlots
-                    ? [{ value: '', label: 'Loading available times...', disabled: true }]
-                    : availableSlots.length === 0
-                      ? [{ value: '', label: 'No available times for this date', disabled: true }]
-                      : [
-                          { value: '', label: '-- Select a time --' },
-                          ...availableSlots.map((slot: Slot) => ({
-                            value: slot.start_time,
-                            label: slot.start_time,
-                          }))
-                        ]
-                }
-                disabled={isLoadingSlots}
-                required
-              />
-              {!isLoadingSlots && availableSlots.length === 0 && selectedDate && (
-                <p className="mt-1 text-sm text-secondary-500">
-                  Please select a different date or contact the restaurant directly.
-                </p>
-              )}
-            </div>
           </div>
 
           <Input
@@ -429,16 +427,17 @@ export function ReservationForm({ branch, table, onBack }: ReservationFormProps)
             className="w-full"
           />
 
-          <div className="flex justify-between gap-4">
+          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={onBack || (() => router.push('/'))}
               disabled={isSubmitting}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               {onBack ? 'Back to Tables' : 'Cancel'}
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmitting}>
+            <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-auto order-1 sm:order-2">
               Book Reservation
             </Button>
           </div>

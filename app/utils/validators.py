@@ -54,3 +54,26 @@ def validate_timezone(tz_name: str) -> str:
         return tz_name
     except Exception:
         raise ValueError(f"Invalid timezone: {tz_name!r}")
+
+
+def get_available_timezones() -> list[str]:
+    """Get all available IANA timezone names, sorted alphabetically."""
+    try:
+        from zoneinfo import available_timezones
+        return sorted(available_timezones())
+    except ImportError:
+        # Fallback for older Python versions or missing tzdata
+        # Return a common subset
+        return sorted([
+            "UTC",
+            "America/New_York",
+            "America/Chicago",
+            "America/Denver",
+            "America/Los_Angeles",
+            "Europe/London",
+            "Europe/Paris",
+            "Asia/Tokyo",
+            "Asia/Shanghai",
+            "Asia/Yerevan",
+            "Australia/Sydney",
+        ])

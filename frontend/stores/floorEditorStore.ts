@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Layout, LayoutTable } from '@/lib/types';
+import type { Layout, LayoutTable, LayoutDocument } from '@/lib/types';
+import { isLayoutV1 } from '@/lib/types';
 import { getLayout, saveLayout } from '@/lib/api';
 
 const GRID_SIZE = 10;
@@ -120,7 +121,11 @@ export const useFloorEditorStore = create<FloorEditorState & FloorEditorActions>
 
   loadLayout: async (branchId) => {
     try {
-      const layout = await getLayout(branchId);
+      const layoutDoc = await getLayout(branchId);
+      // Convert to v1 for backward compatibility
+      const layout: Layout = isLayoutV1(layoutDoc)
+        ? layoutDoc
+        : { width: 800, height: 600, tables: [] };
       set({ layout, branchId, selectedId: null });
     } catch {
       set({
@@ -136,7 +141,11 @@ export const useFloorEditorStore = create<FloorEditorState & FloorEditorActions>
     set({ isSaving: true });
     try {
       const saved = await saveLayout(branchId, layout);
-      set({ layout: saved, isSaving: false });
+      // Convert back to v1 for backward compatibility
+      const layoutV1: Layout = isLayoutV1(saved)
+        ? saved
+        : { width: 800, height: 600, tables: [] };
+      set({ layout: layoutV1, isSaving: false });
     } catch (e) {
       set({ isSaving: false });
       throw e;

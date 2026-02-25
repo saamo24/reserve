@@ -47,7 +47,6 @@ async def main() -> None:
         branch = Branch(
             name="Main Branch",
             address="123 Restaurant St, City",
-            timezone="America/New_York",
             opening_time=time(11, 0),
             closing_time=time(23, 0),
             slot_duration_minutes=120,

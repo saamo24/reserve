@@ -27,6 +27,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             error
               ? 'border-red-300 bg-red-50 focus:ring-red-500'
               : 'border-secondary-300 hover:border-secondary-400',
+            props.disabled && 'bg-secondary-50 cursor-not-allowed opacity-60',
             className
           )}
           {...props}

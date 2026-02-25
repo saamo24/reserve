@@ -17,7 +17,7 @@ def generate_reservation_qr_base64(
     """
     Generate a QR code encoding the reservation detail URL. Returns base64-encoded PNG (no data URI prefix).
     """
-    url = f"{frontend_base_url.rstrip('/')}/reservations/{reservation_id}?code={reservation_code}"
+    url = f"{frontend_base_url.rstrip('/')}/admin/reservations/{reservation_id}?code={reservation_code}"
     qr = qrcode.QRCode(box_size=box_size, border=border)
     qr.add_data(url)
     qr.make(fit=True)

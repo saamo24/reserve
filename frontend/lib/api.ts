@@ -12,6 +12,7 @@ import type {
   PaginatedResponse,
   DashboardStats,
   Layout,
+  LayoutDocument,
 } from './types';
 import type { Slot } from './types';
 
@@ -27,10 +28,21 @@ const getAuthToken = (): string | null => {
   return localStorage.getItem('access_token');
 };
 
+const getGuestToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('guest_token');
+};
+
+const setGuestToken = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('guest_token', token);
+};
+
 /**
  * Single API client for all backend requests. withCredentials must stay true
  * so the guest_id cookie is sent and the same guest session is used (required for
  * My Reservations and reservation creation to match).
+ * Also supports guest token in Authorization header as fallback for Safari ITP.
  */
 const api = axios.create({
   baseURL: getBaseUrl(),
@@ -41,15 +53,33 @@ const api = axios.create({
 api.interceptors.request.use((config: import('axios').InternalAxiosRequestConfig) => {
   // Ensure credentials are always sent; prevent per-request overrides from breaking guest session
   config.withCredentials = true;
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  
+  // Add admin auth token if available
+  const authToken = getAuthToken();
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  } else {
+    // Fallback: Use guest token if cookies aren't working (Safari ITP)
+    // Only use guest token if no admin token is present
+    const guestToken = getGuestToken();
+    if (guestToken) {
+      config.headers.Authorization = `Bearer ${guestToken}`;
+    }
   }
+  
   return config;
 });
 
 api.interceptors.response.use(
-  (r: import('axios').AxiosResponse) => r,
+  (r: import('axios').AxiosResponse) => {
+    // Store guest token from response header (Safari ITP fallback)
+    // Backend sends this in X-Guest-Token header on every response
+    const guestToken = r.headers['x-guest-token'];
+    if (guestToken && typeof guestToken === 'string') {
+      setGuestToken(guestToken);
+    }
+    return r;
+  },
   (err: AxiosError<{ detail?: string | unknown }>) => {
     const detail = err.response?.data?.detail;
     const message = typeof detail === 'string' ? detail : JSON.stringify(detail ?? err.message);
@@ -83,8 +113,8 @@ export async function getBranchTables(branchId: string): Promise<TableResponse[]
   return data;
 }
 
-export async function getLayoutPublic(branchId: string): Promise<Layout> {
-  const { data } = await api.get<Layout>(`/branches/${branchId}/layout`);
+export async function getLayoutPublic(branchId: string): Promise<LayoutDocument> {
+  const { data } = await api.get<LayoutDocument>(`/branches/${branchId}/layout`);
   return data;
 }
 
@@ -98,13 +128,16 @@ export async function getReservedTableIds(
   return data;
 }
 
+
 export async function createReservation(body: ReservationCreate): Promise<ReservationResponse> {
   const { data } = await api.post<ReservationResponse>('/reservations', body);
   return data;
 }
 
 export async function getReservationsMe(): Promise<ReservationResponse[]> {
-  const { data } = await api.get<ReservationResponse[]>('/reservations/me');
+  const { data } = await api.get<ReservationResponse[]>('/reservations/me', {
+    withCredentials: true,
+  });
   return data;
 }
 
@@ -234,6 +267,18 @@ export async function listReservations(params?: {
   return data;
 }
 
+export async function getAdminReservation(
+  reservationId: string,
+  code?: string
+): Promise<ReservationResponse> {
+  const params = code ? { code } : undefined;
+  const { data } = await api.get<ReservationResponse>(
+    `/admin/reservations/${reservationId}`,
+    { params }
+  );
+  return data;
+}
+
 export async function updateReservation(
   reservationId: string,
   body: ReservationUpdate
@@ -256,12 +301,12 @@ export async function getDashboardStats(params?: {
   return data;
 }
 
-export async function getLayout(branchId: string): Promise<Layout> {
-  const { data } = await api.get<Layout>(`/admin/branches/${branchId}/layout`);
+export async function getLayout(branchId: string): Promise<LayoutDocument> {
+  const { data } = await api.get<LayoutDocument>(`/admin/branches/${branchId}/layout`);
   return data;
 }
 
-export async function saveLayout(branchId: string, layout: Layout): Promise<Layout> {
-  const { data } = await api.put<Layout>(`/admin/branches/${branchId}/layout`, layout);
+export async function saveLayout(branchId: string, layout: LayoutDocument): Promise<LayoutDocument> {
+  const { data } = await api.put<LayoutDocument>(`/admin/branches/${branchId}/layout`, layout);
   return data;
 }

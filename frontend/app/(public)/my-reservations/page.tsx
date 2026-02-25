@@ -71,12 +71,12 @@ export default function MyReservationsPage() {
     <>
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12">
           <Card variant="elevated">
-            <CardHeader>
-              <CardTitle className="text-2xl">My Reservations</CardTitle>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-xl sm:text-2xl">My Reservations</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
               {sessionExpired && (
                 <>
                   <p className="text-secondary-700 text-center py-4">
@@ -185,19 +185,19 @@ export default function MyReservationsPage() {
                 <ul className="space-y-4">
                   {reservations.map((r) => (
                     <li key={r.id}>
-                      <div className="bg-secondary-50 rounded-xl p-4 space-y-2">
-                        <div className="flex justify-between items-start">
-                          <p className="font-semibold text-secondary-900">{r.full_name}</p>
-                          <span className="inline-block px-2 py-0.5 bg-secondary-200 text-secondary-800 rounded text-xs font-medium">
+                      <div className="bg-secondary-50 rounded-xl p-3 sm:p-4 space-y-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <p className="font-semibold text-sm sm:text-base text-secondary-900 break-words flex-1">{r.full_name}</p>
+                          <span className="inline-block px-2 py-0.5 bg-secondary-200 text-secondary-800 rounded text-xs font-medium whitespace-nowrap flex-shrink-0">
                             {r.status}
                           </span>
                         </div>
-                        <p className="text-sm text-secondary-600">
+                        <p className="text-xs sm:text-sm text-secondary-600">
                           {formatDateDisplay(r.reservation_date)} at {formatTime(r.start_time)}
                         </p>
-                        <p className="text-sm text-secondary-600">{r.phone_number}</p>
+                        <p className="text-xs sm:text-sm text-secondary-600">{r.phone_number}</p>
                         {r.notes && (
-                          <p className="text-sm text-secondary-500 italic">{r.notes}</p>
+                          <p className="text-xs sm:text-sm text-secondary-500 italic break-words">{r.notes}</p>
                         )}
                         {r.reservation_code && (
                           <Link

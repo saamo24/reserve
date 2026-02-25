@@ -71,12 +71,12 @@ export default function SuccessPage() {
     <>
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12">
           <Card variant="elevated">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <CardHeader className="text-center px-4 sm:px-6">
+              <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
                 <svg
-                  className="w-8 h-8 text-green-600"
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-green-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -89,10 +89,10 @@ export default function SuccessPage() {
                   />
                 </svg>
               </div>
-              <CardTitle className="text-2xl">Reservation Confirmed!</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">Reservation Confirmed!</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-secondary-50 rounded-xl p-6 space-y-3">
+            <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="bg-secondary-50 rounded-xl p-4 sm:p-6 space-y-3">
                 <div>
                   <p className="text-sm text-secondary-600">Name</p>
                   <p className="font-semibold text-secondary-900">{reservation.full_name}</p>
@@ -133,25 +133,25 @@ export default function SuccessPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href={`/${restaurantSlug}`} className="flex-1">
+              <div className="flex flex-col gap-3 sm:gap-4 pt-4">
+                <Link href={`/${restaurantSlug}`} className="w-full">
                   <Button variant="outline" className="w-full">
                     Make Another Reservation
                   </Button>
                 </Link>
-                <Link href="/my-reservations" className="flex-1">
+                <Link href="/my-reservations" className="w-full">
                   <Button variant="outline" className="w-full">
                     View my reservations
                   </Button>
                 </Link>
-                <Link href="/" className="flex-1">
+                <Link href="/" className="w-full">
                   <Button variant="primary" className="w-full">
                     Back to Home
                   </Button>
                 </Link>
               </div>
 
-              <p className="text-sm text-secondary-500 text-center pt-4">
+              <p className="text-xs sm:text-sm text-secondary-500 text-center pt-4">
                 A confirmation email has been sent to {reservation.email || 'your email address'}
               </p>
             </CardContent>

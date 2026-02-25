@@ -26,6 +26,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             error
               ? 'border-red-300 bg-red-50 focus:ring-red-500'
               : 'border-secondary-300 bg-white hover:border-secondary-400',
+            props.disabled && 'bg-secondary-50 cursor-not-allowed opacity-60',
             className
           )}
           {...props}

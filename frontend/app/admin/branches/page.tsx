@@ -18,7 +18,6 @@ export default function BranchesPage() {
   const [formData, setFormData] = useState<BranchCreate>({
     name: '',
     address: '',
-    timezone: 'UTC',
     opening_time: '09:00',
     closing_time: '22:00',
     slot_duration_minutes: 120,
@@ -57,7 +56,6 @@ export default function BranchesPage() {
       setFormData({
         name: '',
         address: '',
-        timezone: 'UTC',
         opening_time: '09:00',
         closing_time: '22:00',
         slot_duration_minutes: 120,
@@ -75,7 +73,6 @@ export default function BranchesPage() {
     setFormData({
       name: branch.name,
       address: branch.address,
-      timezone: branch.timezone,
       opening_time: branch.opening_time.substring(0, 5),
       closing_time: branch.closing_time.substring(0, 5),
       slot_duration_minutes: branch.slot_duration_minutes,
@@ -89,7 +86,6 @@ export default function BranchesPage() {
     setFormData({
       name: '',
       address: '',
-      timezone: 'UTC',
       opening_time: '09:00',
       closing_time: '22:00',
       slot_duration_minutes: 120,
@@ -148,7 +144,6 @@ export default function BranchesPage() {
                     Hours: {branch.opening_time.substring(0, 5)} -{' '}
                     {branch.closing_time.substring(0, 5)}
                   </p>
-                  <p>Timezone: {branch.timezone}</p>
                   <p>Slot Duration: {branch.slot_duration_minutes} minutes</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => handleEdit(branch)}>
@@ -179,12 +174,6 @@ export default function BranchesPage() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   required
-                />
-                <Input
-                  label="Timezone"
-                  value={formData.timezone}
-                  onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                  placeholder="America/New_York"
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <Input

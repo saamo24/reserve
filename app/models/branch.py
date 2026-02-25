@@ -19,7 +19,6 @@ class Branch(Base, TimestampMixin):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=__import__("uuid").uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     address: Mapped[str] = mapped_column(String(512), nullable=False)
-    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
     opening_time: Mapped[time] = mapped_column(Time, nullable=False)
     closing_time: Mapped[time] = mapped_column(Time, nullable=False)
     slot_duration_minutes: Mapped[int] = mapped_column(nullable=False, default=120)
