@@ -138,13 +138,17 @@ class ReservationService:
                 status=initial_status,
                 notes=body.notes,
             )
+            # Save reservation first to get the ID
+            await self._reservation_repo.create(reservation)
+            await self._session.flush()  # Flush to get the ID without committing
+            
+            # Now generate QR code with the actual reservation ID
             settings = get_settings()
             reservation.qr_code_base64 = generate_reservation_qr_base64(
                 reservation.id,
                 reservation_code,
                 settings.frontend_base_url,
             )
-            await self._reservation_repo.create(reservation)
             await self._session.commit()
 
             # Invalidate caches

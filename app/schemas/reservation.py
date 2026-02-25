@@ -41,7 +41,7 @@ class ReservationUpdate(BaseModel):
 
 
 class ReservationResponsePublic(BaseModel):
-    """Reservation response for public API (no qr_code; admin-only)."""
+    """Reservation response for public API (includes qr_code for reservation owner)."""
 
     id: UUID
     branch_id: UUID
@@ -55,6 +55,7 @@ class ReservationResponsePublic(BaseModel):
     status: ReservationStatus
     notes: str | None
     reservation_code: str | None = None
+    qr_code: str | None = None  # base64-encoded PNG; allows owner to view/scan their reservation
     created_at: datetime
     updated_at: datetime
 
