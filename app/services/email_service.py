@@ -1,8 +1,10 @@
 """Email service for sending reservation notifications."""
 
+import base64
 import aiosmtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from pathlib import Path
 from uuid import UUID
 
@@ -34,24 +36,62 @@ class EmailService:
         subject: str,
         html_body: str,
         text_body: str | None = None,
+        embedded_images: dict[str, str] | None = None,
     ) -> None:
-        """Send an email via SMTP."""
+        """
+        Send an email via SMTP.
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_body: HTML email body
+            text_body: Optional plain text body
+            embedded_images: Optional dict of {cid: base64_image_data} for embedded images
+        """
         if not self.settings.smtp_host:
             logger.warning("SMTP not configured, skipping email send")
+            logger.warning(f"Would have sent email to {to_email} with subject: {subject}")
             return
+        
+        logger.info(f"Attempting to send email to {to_email} with subject: {subject}")
 
-        message = MIMEMultipart("alternative")
+        # Use 'related' multipart to support embedded images
+        if embedded_images:
+            message = MIMEMultipart("related")
+        else:
+            message = MIMEMultipart("alternative")
+        
         message["Subject"] = subject
         message["From"] = self.settings.smtp_from_email
         message["To"] = to_email
 
+        # Create alternative part for text/html
+        if embedded_images:
+            alt_part = MIMEMultipart("alternative")
+            message.attach(alt_part)
+            container = alt_part
+        else:
+            container = message
+
         # Add text and HTML parts
         if text_body:
             text_part = MIMEText(text_body, "plain")
-            message.attach(text_part)
+            container.attach(text_part)
         
         html_part = MIMEText(html_body, "html")
-        message.attach(html_part)
+        container.attach(html_part)
+
+        # Add embedded images if provided
+        if embedded_images:
+            for cid, base64_data in embedded_images.items():
+                try:
+                    image_data = base64.b64decode(base64_data)
+                    image = MIMEImage(image_data)
+                    image.add_header("Content-ID", f"<{cid}>")
+                    image.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
+                    message.attach(image)
+                except Exception as e:
+                    logger.warning(f"Failed to embed image {cid}: {e}")
 
         smtp = None
         try:
@@ -148,20 +188,39 @@ class EmailService:
 
         # Send to user if email exists
         if reservation.email:
+            logger.info(f"Sending status update email to {reservation.email} for reservation {reservation.id}")
             template = self.env.get_template("status_update.html")
+            
+            # Include QR code in email if status is CONFIRMED and QR code exists
+            embedded_images = None
+            has_qr_code = reservation.status == ReservationStatus.CONFIRMED and reservation.qr_code_base64 is not None
+            
+            if has_qr_code:
+                embedded_images = {"qr_code": reservation.qr_code_base64}
+                logger.info(f"Including QR code in confirmation email for reservation {reservation.id}")
+            else:
+                logger.warning(f"No QR code available for reservation {reservation.id} (status: {reservation.status}, qr_code_base64: {reservation.qr_code_base64 is not None})")
+            
             html_body = template.render(
                 reservation=reservation,
                 status=reservation.status,
                 old_status=old_status,
+                has_qr_code=has_qr_code,
             )
 
             status_text = reservation.status.value.lower()
             subject = f"Reservation {status_text} - {reservation.branch.name}"
-            await self._send_email(
-                to_email=reservation.email,
-                subject=subject,
-                html_body=html_body,
-            )
+            try:
+                await self._send_email(
+                    to_email=reservation.email,
+                    subject=subject,
+                    html_body=html_body,
+                    embedded_images=embedded_images,
+                )
+                logger.info(f"Successfully sent status update email to {reservation.email}")
+            except Exception as e:
+                logger.error(f"Failed to send status update email to {reservation.email}: {e}", exc_info=True)
+                raise
 
         # Always send status update to admin
         await self.send_admin_status_update(reservation, old_status)

@@ -78,6 +78,26 @@
                         </td>
                     </tr>
 
+                    <!-- QR Code Section (only for CONFIRMED status) -->
+                    {% if has_qr_code %}
+                    <tr>
+                        <td align="center" style="padding-top:25px;">
+                            <div style="background:#ffffff;border:2px solid #e5e7eb;border-radius:8px;padding:20px;display:inline-block;">
+                                <p style="margin:0 0 12px 0;color:#374151;font-weight:bold;font-size:14px;">
+                                    📱 Your Reservation QR Code
+                                </p>
+                                <p style="margin:0 0 15px 0;color:#6b7280;font-size:12px;">
+                                    Show this QR code when you arrive at the restaurant
+                                </p>
+                                <img src="cid:qr_code" alt="Reservation QR Code" style="width:200px;height:200px;display:block;margin:0 auto;" />
+                                <p style="margin:15px 0 0 0;color:#6b7280;font-size:11px;">
+                                    Scan this code to view your reservation details
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+
                     <!-- Bottom Message -->
                     <tr>
                         <td style="padding-top:20px;font-size:14px;color:#374151;">
