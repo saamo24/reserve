@@ -14,10 +14,11 @@ A **Makefile** is provided: run `make help` to list targets (`setup`, `install`,
 
 ### Local (Docker Compose)
 
-1. Copy environment and start services:
+1. Set environment variables and start services:
 
 ```bash
-make setup   # optional: creates .env from .env.example if missing
+# Set required environment variables (see docker-compose.yml for defaults)
+# For custom config, export variables or set them in docker-compose.yml
 docker compose up -d
 # or: make up
 ```
@@ -31,12 +32,16 @@ docker compose up -d
 
 ### Local development (no Docker)
 
-1. Install dependencies and set env:
+1. Install dependencies and set environment variables:
 
 ```bash
 pip install -e .
-cp .env.example .env
-# Edit .env: DATABASE_URL, REDIS_URL for local Postgres/Redis
+
+# Set environment variables (export or use your shell's method):
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/reserve"
+export REDIS_URL="redis://localhost:6379/0"
+export APP_ENV="development"
+# ... other variables as needed
 ```
 
 2. Start Postgres and Redis locally, then:
@@ -47,7 +52,7 @@ python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
-**My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Keep `APP_ENV=development` in `.env` for this behavior.
+**My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Set `APP_ENV=development` as an environment variable for this behavior.
 
 ## Deploying to Render
 
@@ -63,7 +68,7 @@ uvicorn app.main:app --reload
 ## Performance Tuning
 
 - **Indexes**: Reservations use `(branch_id, reservation_date)`, `(table_id, reservation_date)`, and a partial unique index for overlap prevention.
-- **Connection pools**: Set `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `REDIS_POOL_SIZE` in `.env`.
+- **Connection pools**: Set `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `REDIS_POOL_SIZE` as environment variables.
 - **Lock TTL**: `LOCK_TTL_SECONDS=10` for reservation slot locks; increase only if create flow is slow.
 
 ## Example cURL Requests

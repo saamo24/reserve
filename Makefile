@@ -210,9 +210,9 @@ populate:
 	@echo "Populating database (Docker, local DB)..."
 	@$(COMPOSE) -f $(COMPOSE_FILE) run --rm $(API_SERVICE) python $(POPULATE_SCRIPT)
 
-## Populate database using .env (e.g. remote server DB); run from project root with deps installed
+## Populate database using environment variables (e.g. remote server DB); run from project root with deps installed
 populate-local:
-	@echo "Populating database using .env (DATABASE_URL from .env)..."
+	@echo "Populating database using environment variables (DATABASE_URL from env)..."
 	@python $(POPULATE_SCRIPT)
 
 # ============================================================================
@@ -302,7 +302,7 @@ help:
 	@echo ""
 	@echo "Data:"
 	@echo "  populate            - Populate database (Docker, local DB)"
-	@echo "  populate-local      - Populate database using .env (e.g. remote DB from host)"
+	@echo "  populate-local      - Populate database using environment variables (e.g. remote DB from host)"
 	@echo ""
 	@echo "HTTPS / Nginx:"
 	@echo "  generate-ssl        - Generate self-signed SSL certificates"
@@ -321,4 +321,4 @@ help:
 	@echo "  make migrate-revision MESSAGE='add users table' - Create migration"
 	@echo "  make tests                   - Run full test suite"
 	@echo "  make populate                - Populate DB (Docker)"
-	@echo "  make populate-local          - Populate DB from .env (e.g. server DB)"
+	@echo "  make populate-local          - Populate DB using environment variables (e.g. server DB)"
