@@ -3,11 +3,8 @@ set -e
 echo "Running migrations..."
 alembic upgrade head
 
-# Optional: run seed/populate once (e.g. set RUN_POPULATE=1 on first deploy)
-if [ "${RUN_POPULATE}" = "1" ] || [ "${RUN_POPULATE}" = "true" ]; then
-  echo "Running populate (seed)..."
-  python scripts/seed.py
-fi
+echo "Running populate (seed)..."
+python scripts/seed.py
 
 # If a command was passed (e.g. python scripts/seed.py, make migrate-revision), run it and exit
 if [ $# -gt 0 ]; then

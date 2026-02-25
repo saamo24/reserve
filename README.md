@@ -14,10 +14,11 @@ A **Makefile** is provided: run `make help` to list targets (`setup`, `install`,
 
 ### Local (Docker Compose)
 
-1. Copy environment and start services:
+1. Set environment variables and start services:
 
 ```bash
-make setup   # optional: creates .env from .env.example if missing
+# Set required environment variables (see docker-compose.yml for defaults)
+# For custom config, export variables or set them in docker-compose.yml
 docker compose up -d
 # or: make up
 ```
@@ -31,12 +32,16 @@ docker compose up -d
 
 ### Local development (no Docker)
 
-1. Install dependencies and set env:
+1. Install dependencies and set environment variables:
 
 ```bash
 pip install -e .
-cp .env.example .env
-# Edit .env: DATABASE_URL, REDIS_URL for local Postgres/Redis
+
+# Set environment variables (export or use your shell's method):
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/reserve"
+export REDIS_URL="redis://localhost:6379/0"
+export APP_ENV="development"
+# ... other variables as needed
 ```
 
 2. Start Postgres and Redis locally, then:
@@ -47,11 +52,11 @@ python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
-**My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Keep `APP_ENV=development` in `.env` for this behavior.
+**My Reservations (frontend):** With the frontend on a different port (e.g. Next.js on 3000, API on 8000), the app uses a guest cookie with `SameSite=None` in development so the cookie is sent cross-origin and "My Reservations" shows the correct list. Set `APP_ENV=development` as an environment variable for this behavior.
 
 ## Deploying to Render
 
-- **Backend (Docker):** Use the root `Dockerfile`. To seed the DB on first deploy, set env `RUN_POPULATE=1` (or `RUN_POPULATE=true`) on the API service; the entrypoint will run migrations then `python scripts/seed.py` before starting the server. Remove the var after the first run to avoid re-running seed on every deploy. Alternatively run a one-off with the same image and start command: `./scripts/run-populate.sh` (migrations + seed then exit).
+- **Backend (Docker):** Use the root `Dockerfile`. The entrypoint runs migrations then `python scripts/seed.py` (populate) on every container start before starting the server. The seed script is idempotent (skips if data already exists). For a one-off run use: `./scripts/run-populate.sh` (migrations + seed then exit).
 - **Frontend:** Set `NEXT_PUBLIC_API_URL` to your backend URL (e.g. `https://your-api.onrender.com`) and redeploy so the build uses it; otherwise the app will call `localhost:8000` and you’ll see `ERR_CONNECTION_REFUSED`.
 
 ## Scaling Notes
@@ -63,7 +68,7 @@ uvicorn app.main:app --reload
 ## Performance Tuning
 
 - **Indexes**: Reservations use `(branch_id, reservation_date)`, `(table_id, reservation_date)`, and a partial unique index for overlap prevention.
-- **Connection pools**: Set `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `REDIS_POOL_SIZE` in `.env`.
+- **Connection pools**: Set `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `REDIS_POOL_SIZE` as environment variables.
 - **Lock TTL**: `LOCK_TTL_SECONDS=10` for reservation slot locks; increase only if create flow is slow.
 
 ## Example cURL Requests
@@ -137,7 +142,7 @@ curl -s http://localhost:8000/admin/dashboard/stats \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-**First admin:** Run `make seed` (or `python scripts/seed.py`) after migrations to create a default admin user (email: `admin@example.com`, password: `admin123` by default, configurable via `ADMIN_EMAIL` and `ADMIN_TEMP_PASSWORD` env vars). Change the password in production.
+**First admin:** When using Docker, the entrypoint runs the seed script at startup, which creates the default admin if missing. Otherwise run `make seed` (or `python scripts/seed.py`) after migrations. Default: email `admin@example.com`, password `admin123` (configurable via `ADMIN_EMAIL` and `ADMIN_TEMP_PASSWORD`). Change the password in production.
 
 ## Response Format
 

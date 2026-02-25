@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { listReservations, updateReservation, listBranches } from '@/lib/api';
+import { listReservations, updateReservation, listBranches, getAdminReservation } from '@/lib/api';
 import { ReservationResponse, ReservationStatus, BranchResponse } from '@/lib/types';
+import { formatDateDisplay, formatTime } from '@/lib/utils';
 import { ReservationTable } from '@/components/ReservationTable';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ export default function ReservationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [detailReservation, setDetailReservation] = useState<ReservationResponse | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [filters, setFilters] = useState({
     branch_id: '',
     date: '',
@@ -108,6 +111,22 @@ export default function ReservationsPage() {
     setPage(1);
   };
 
+  const handleViewDetails = async (reservation: ReservationResponse) => {
+    try {
+      setIsLoadingDetails(true);
+      // Fetch full reservation details to ensure we have the QR code
+      const fullReservation = await getAdminReservation(reservation.id);
+      setDetailReservation(fullReservation);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load reservation details';
+      toast.error(errorMessage);
+      // Fallback to showing the reservation from the list if fetch fails
+      setDetailReservation(reservation);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -177,7 +196,92 @@ export default function ReservationsPage() {
             reservations={reservations}
             onStatusUpdate={handleStatusUpdate}
             onDelete={handleDelete}
+            onViewDetails={handleViewDetails}
           />
+
+          {detailReservation && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <Card variant="elevated" className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Reservation details</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDetailReservation(null)}
+                    aria-label="Close"
+                  >
+                    Close
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isLoadingDetails ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 text-sm">
+                        <div>
+                          <p className="text-secondary-600">Name</p>
+                          <p className="font-semibold text-secondary-900">{detailReservation.full_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-secondary-600">Phone</p>
+                          <p className="font-semibold text-secondary-900">{detailReservation.phone_number}</p>
+                        </div>
+                        {detailReservation.email && (
+                          <div>
+                            <p className="text-secondary-600">Email</p>
+                            <p className="font-semibold text-secondary-900">{detailReservation.email}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-secondary-600">Date & time</p>
+                          <p className="font-semibold text-secondary-900">
+                            {formatDateDisplay(detailReservation.reservation_date)} at{' '}
+                            {formatTime(detailReservation.start_time)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-secondary-600">Status</p>
+                          <span className="inline-block px-2 py-0.5 bg-secondary-200 text-secondary-800 rounded text-xs font-medium">
+                            {detailReservation.status}
+                          </span>
+                        </div>
+                        {detailReservation.notes && (
+                          <div>
+                            <p className="text-secondary-600">Notes</p>
+                            <p className="font-semibold text-secondary-900">{detailReservation.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                      {detailReservation.qr_code ? (
+                        <div className="border-t border-secondary-200 pt-4 flex flex-col items-center gap-3">
+                          <p className="text-sm font-medium text-secondary-900">QR Code</p>
+                          <p className="text-xs text-secondary-600 text-center">
+                            Scan this code to view reservation details
+                          </p>
+                          <div className="bg-white rounded-xl p-4 border-2 border-secondary-200 shadow-sm">
+                            <img
+                              src={`data:image/png;base64,${detailReservation.qr_code}`}
+                              alt="Reservation QR code"
+                              className="w-48 h-48 object-contain"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border-t border-secondary-200 pt-4">
+                          <p className="text-sm text-secondary-500 text-center italic">
+                            QR code not available for this reservation
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">

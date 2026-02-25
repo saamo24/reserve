@@ -51,6 +51,8 @@ export interface ReservationResponse {
   status: ReservationStatus;
   notes: string | null;
   reservation_code?: string | null;
+  /** Base64-encoded PNG QR code for this reservation */
+  qr_code?: string | null;
   created_at: string;
   updated_at: string;
 }

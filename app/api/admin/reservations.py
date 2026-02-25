@@ -63,6 +63,25 @@ async def list_reservations(
     )
 
 
+@router.get("/{reservation_id}", response_model=ReservationResponse)
+async def get_reservation(
+    reservation_id: UUID,
+    admin: CurrentAdmin,
+    db: DbSession,
+    redis: RedisDep,
+    code: str | None = Query(None, description="Reservation code for additional verification"),
+) -> ReservationResponse:
+    """Get reservation by id (admin only). Optionally verify with code."""
+    service = _reservation_service(db, redis)
+    reservation = await service.get_by_id(reservation_id, load_relations=True)
+    if reservation is None:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    # Optionally verify code if provided
+    if code and reservation.reservation_code != code:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    return reservation
+
+
 @router.patch("/{reservation_id}", response_model=ReservationResponse)
 async def update_reservation(
     reservation_id: UUID,

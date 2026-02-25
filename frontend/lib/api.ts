@@ -267,6 +267,18 @@ export async function listReservations(params?: {
   return data;
 }
 
+export async function getAdminReservation(
+  reservationId: string,
+  code?: string
+): Promise<ReservationResponse> {
+  const params = code ? { code } : undefined;
+  const { data } = await api.get<ReservationResponse>(
+    `/admin/reservations/${reservationId}`,
+    { params }
+  );
+  return data;
+}
+
 export async function updateReservation(
   reservationId: string,
   body: ReservationUpdate

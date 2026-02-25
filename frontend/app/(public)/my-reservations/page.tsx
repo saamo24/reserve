@@ -199,6 +199,16 @@ export default function MyReservationsPage() {
                         {r.notes && (
                           <p className="text-xs sm:text-sm text-secondary-500 italic break-words">{r.notes}</p>
                         )}
+                        {r.reservation_code && (
+                          <Link
+                            href={`/view-reservation?id=${encodeURIComponent(r.id)}&code=${encodeURIComponent(r.reservation_code)}`}
+                            className="inline-block mt-2"
+                          >
+                            <Button variant="outline" size="sm">
+                              View details
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </li>
                   ))}

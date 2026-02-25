@@ -19,6 +19,8 @@ from app.services.caching_service import CachingService
 from app.services.email_service import EmailService
 from app.services.locking_service import LockingService
 from app.services.timeslot_service import TimeslotService
+from app.core.config import get_settings
+from app.utils.qr_code import generate_reservation_qr_base64
 from app.utils.validators import time_in_range
 
 
@@ -121,9 +123,10 @@ class ReservationService:
                 ReservationStatus.PENDING if body.email else ReservationStatus.CONFIRMED
             )
 
+            reservation_code = _generate_reservation_code()
             reservation = Reservation(
                 guest_id=guest_id,
-                reservation_code=_generate_reservation_code(),
+                reservation_code=reservation_code,
                 branch_id=body.branch_id,
                 table_id=table_id,
                 full_name=body.full_name,
@@ -135,7 +138,17 @@ class ReservationService:
                 status=initial_status,
                 notes=body.notes,
             )
+            # Save reservation first to get the ID
             await self._reservation_repo.create(reservation)
+            await self._session.flush()  # Flush to get the ID without committing
+            
+            # Now generate QR code with the actual reservation ID
+            settings = get_settings()
+            reservation.qr_code_base64 = generate_reservation_qr_base64(
+                reservation.id,
+                reservation_code,
+                settings.frontend_base_url,
+            )
             await self._session.commit()
 
             # Invalidate caches

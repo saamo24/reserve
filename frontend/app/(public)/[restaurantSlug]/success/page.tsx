@@ -133,6 +133,24 @@ export default function SuccessPage() {
                 </div>
               </div>
 
+              {reservation.qr_code && (
+                <div className="border-t border-secondary-200 pt-4">
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="text-sm font-medium text-secondary-900">QR Code</p>
+                    <p className="text-xs text-secondary-600 text-center">
+                      Scan this code to view your reservation details
+                    </p>
+                    <div className="bg-white rounded-xl p-4 border-2 border-secondary-200 shadow-sm">
+                      <img
+                        src={`data:image/png;base64,${reservation.qr_code}`}
+                        alt="Reservation QR code"
+                        className="w-48 h-48 object-contain"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3 sm:gap-4 pt-4">
                 <Link href={`/${restaurantSlug}`} className="w-full">
                   <Button variant="outline" className="w-full">
