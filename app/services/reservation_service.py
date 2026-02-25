@@ -295,9 +295,27 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
+        # Reload reservation with all relations and QR code to ensure we have complete data for email
+        reservation = await self._reservation_repo.get_by_id(
+            reservation.id, load_branch=True, load_table=True
+        )
+
         # Send status update email in background (don't block response on SMTP)
-        email_service = EmailService()
-        asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
+        if reservation and reservation.email:
+            email_service = EmailService()
+            # Use asyncio.create_task but add error handling
+            task = asyncio.create_task(
+                email_service.send_reservation_status_update(reservation, old_status)
+            )
+            # Add error callback to log any failures
+            def log_email_error(task):
+                try:
+                    task.result()
+                except Exception as e:
+                    from app.core.logging import get_logger
+                    logger = get_logger(__name__)
+                    logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
+            task.add_done_callback(log_email_error)
 
         return reservation
 

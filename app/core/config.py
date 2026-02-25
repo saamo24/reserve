@@ -8,11 +8,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Environment-based configuration. Reads from environment variables only."""
+    """Environment-based configuration. Reads from environment variables and .env file."""
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
         extra="ignore",
+        env_file=".env",
+        env_file_encoding="utf-8",
     )
 
     # App
