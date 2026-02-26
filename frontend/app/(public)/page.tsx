@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getBranches } from '@/lib/api';
 import { BranchResponse } from '@/lib/types';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import toast from 'react-hot-toast';
 
 export default function HomePage() {
+  const router = useRouter();
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,13 @@ export default function HomePage() {
         setIsLoading(true);
         const data = await getBranches();
         setBranches(data);
+        
+        // If there's exactly one branch, automatically redirect to it
+        if (data.length === 1) {
+          const branch = data[0];
+          router.push(`/${slugify(branch.name)}`);
+          return;
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load branches';
         setError(errorMessage);
@@ -32,9 +41,19 @@ export default function HomePage() {
     }
 
     fetchBranches();
-  }, []);
+  }, [router]);
 
   if (isLoading) {
+    return (
+      <>
+        <Navbar />
+        <LoadingPage />
+      </>
+    );
+  }
+
+  // If there's exactly one branch, show loading while redirecting
+  if (branches.length === 1) {
     return (
       <>
         <Navbar />
