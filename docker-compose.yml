@@ -13,6 +13,8 @@ services:
       - WORKERS=4
       - DB_POOL_SIZE=10
       - REDIS_POOL_SIZE=10
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +52,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  celery_worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/reserve
+      - REDIS_URL=redis://redis:6379/0
+      - APP_ENV=development
+      - LOG_LEVEL=INFO
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    command: celery -A app.core.celery_app worker --loglevel=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     build:

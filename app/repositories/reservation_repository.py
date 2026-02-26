@@ -24,6 +24,7 @@ class ReservationRepository(AsyncRepository[Reservation]):
         *,
         load_branch: bool = False,
         load_table: bool = False,
+        load_guest: bool = False,
     ) -> Reservation | None:
         """Get reservation by id."""
         q = select(Reservation).where(Reservation.id == id)
@@ -31,6 +32,8 @@ class ReservationRepository(AsyncRepository[Reservation]):
             q = q.options(selectinload(Reservation.branch))
         if load_table:
             q = q.options(selectinload(Reservation.table))
+        if load_guest:
+            q = q.options(selectinload(Reservation.guest))
         result = await self._session.execute(q)
         return result.scalar_one_or_none()
 
@@ -51,6 +54,27 @@ class ReservationRepository(AsyncRepository[Reservation]):
             q = q.options(selectinload(Reservation.branch))
         if load_table:
             q = q.options(selectinload(Reservation.table))
+        result = await self._session.execute(q)
+        return result.scalar_one_or_none()
+
+    async def get_by_code(
+        self,
+        code: str,
+        *,
+        load_branch: bool = False,
+        load_table: bool = False,
+        load_guest: bool = False,
+    ) -> Reservation | None:
+        """Get reservation by reservation_code only. Returns most recent if multiple exist."""
+        q = select(Reservation).where(Reservation.reservation_code == code)
+        # Order by created_at desc to get most recent if multiple exist (shouldn't happen due to unique constraint)
+        q = q.order_by(Reservation.created_at.desc())
+        if load_branch:
+            q = q.options(selectinload(Reservation.branch))
+        if load_table:
+            q = q.options(selectinload(Reservation.table))
+        if load_guest:
+            q = q.options(selectinload(Reservation.guest))
         result = await self._session.execute(q)
         return result.scalar_one_or_none()
 
@@ -159,6 +183,113 @@ class ReservationRepository(AsyncRepository[Reservation]):
             )
         )
         return list({row[0] for row in result.all()})
+
+    async def get_most_recent_by_phone_number(
+        self,
+        phone_number: str,
+        *,
+        load_branch: bool = False,
+        load_table: bool = False,
+        load_guest: bool = False,
+    ) -> Reservation | None:
+        """
+        Get the most recent reservation by phone number.
+        Uses flexible matching (normalizes phone numbers for comparison).
+        
+        Args:
+            phone_number: Phone number to search for
+            load_branch: Whether to load branch relationship
+            load_table: Whether to load table relationship
+            load_guest: Whether to load guest relationship
+            
+        Returns:
+            Most recent reservation with the given phone number, or None if not found
+        """
+        # Normalize phone number: remove spaces, dashes, parentheses, keep + and digits
+        normalized_search = phone_number.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').strip()
+        
+        # Try exact match first
+        q = (
+            select(Reservation)
+            .where(Reservation.phone_number == phone_number)
+            .order_by(Reservation.created_at.desc())
+            .limit(1)
+        )
+        if load_branch:
+            q = q.options(selectinload(Reservation.branch))
+        if load_table:
+            q = q.options(selectinload(Reservation.table))
+        if load_guest:
+            q = q.options(selectinload(Reservation.guest))
+        result = await self._session.execute(q)
+        reservation = result.scalar_one_or_none()
+        
+        # If not found with exact match, try normalized comparison
+        if reservation is None:
+            # Get all reservations and compare normalized phone numbers
+            all_q = select(Reservation).order_by(Reservation.created_at.desc())
+            all_result = await self._session.execute(all_q)
+            all_reservations = all_result.scalars().all()
+            
+            for res in all_reservations:
+                normalized_db = res.phone_number.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').strip()
+                if normalized_db == normalized_search:
+                    # Reload with relationships if needed
+                    if load_branch or load_table or load_guest:
+                        return await self.get_by_id(res.id, load_branch=load_branch, load_table=load_table, load_guest=load_guest)
+                    return res
+        
+        return reservation
+
+    async def find_tg_chat_id_by_phone_number(self, phone_number: str) -> int | None:
+        """
+        Find tg_chat_id by searching reservations with the same phone number.
+        
+        Searches for all reservations with the given phone number, finds their guests,
+        and returns the first non-null tg_chat_id found.
+        
+        Args:
+            phone_number: Phone number to search for
+            
+        Returns:
+            Telegram chat ID if found, None otherwise
+        """
+        # Get distinct guest_ids for reservations with this phone number
+        q = (
+            select(Reservation.guest_id)
+            .where(Reservation.phone_number == phone_number)
+            .distinct()
+        )
+        result = await self._session.execute(q)
+        guest_ids = [row[0] for row in result.all()]
+        
+        if not guest_ids:
+            return None
+        
+        # Load guests and find one with tg_chat_id
+        from app.models.guest import Guest
+        from app.core.logging import get_logger
+        logger = get_logger(__name__)
+        
+        guest_q = select(Guest).where(
+            Guest.id.in_(guest_ids),
+            Guest.tg_chat_id.isnot(None)
+        ).limit(1)
+        guest_result = await self._session.execute(guest_q)
+        guest = guest_result.scalar_one_or_none()
+        
+        if guest:
+            logger.info(
+                f"Found tg_chat_id {guest.tg_chat_id} for phone number {phone_number} "
+                f"via guest {guest.id} (searched {len(guest_ids)} guest_ids)"
+            )
+        else:
+            logger.debug(
+                f"No tg_chat_id found for phone number {phone_number} "
+                f"(searched {len(guest_ids)} guest_ids, none have tg_chat_id)"
+            )
+        
+        return guest.tg_chat_id if guest else None
 
     async def create(self, reservation: Reservation) -> Reservation:
         """Create reservation. Raises IntegrityError if partial unique violated."""

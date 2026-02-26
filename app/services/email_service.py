@@ -154,12 +154,23 @@ class EmailService:
         confirm_url = f"{frontend_url}/reservations/{reservation.id}/confirm?token={confirm_token}"
         cancel_url = f"{frontend_url}/reservations/{reservation.id}/cancel?token={cancel_token}"
 
+        # Build Telegram bot URL if bot username and reservation code are available
+        telegram_bot_url = None
+        if self.settings.tg_bot_username and reservation.reservation_code:
+            telegram_bot_url = f"https://t.me/{self.settings.tg_bot_username}?start={reservation.reservation_code}"
+            logger.info(f"Including Telegram bot link in email for reservation {reservation.id}: {telegram_bot_url}")
+        elif not self.settings.tg_bot_username:
+            logger.debug(f"TG_BOT_USERNAME not configured, skipping Telegram link in email for reservation {reservation.id}")
+        elif not reservation.reservation_code:
+            logger.warning(f"Reservation {reservation.id} has no reservation_code, cannot include Telegram link in email")
+
         # Load and render template
         template = self.env.get_template("confirmation.html")
         html_body = template.render(
             reservation=reservation,
             confirm_url=confirm_url,
             cancel_url=cancel_url,
+            telegram_bot_url=telegram_bot_url,
         )
 
         subject = f"Please confirm your reservation at {reservation.branch.name}"

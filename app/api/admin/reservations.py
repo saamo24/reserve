@@ -7,14 +7,15 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import CurrentAdmin, DbSession, RedisDep
 from app.models.reservation import ReservationStatus
+from app.repositories.branch_repository import BranchRepository
+from app.repositories.guest_repository import GuestRepository
 from app.repositories.reservation_repository import ReservationRepository
+from app.repositories.table_repository import TableRepository
 from app.schemas.common import PaginatedResponse, PaginationMeta
 from app.schemas.reservation import ReservationResponse, ReservationUpdate
-from app.services.reservation_service import ReservationService
-from app.services.locking_service import LockingService
 from app.services.caching_service import CachingService
-from app.repositories.branch_repository import BranchRepository
-from app.repositories.table_repository import TableRepository
+from app.services.locking_service import LockingService
+from app.services.reservation_service import ReservationService
 
 router = APIRouter(prefix="/reservations", tags=["admin-reservations"])
 
@@ -25,6 +26,7 @@ def _reservation_service(db: DbSession, redis: RedisDep) -> ReservationService:
         branch_repo=BranchRepository(db),
         table_repo=TableRepository(db),
         reservation_repo=ReservationRepository(db),
+        guest_repo=GuestRepository(db),
         locking=LockingService(redis),
         caching=CachingService(redis),
     )

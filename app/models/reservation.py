@@ -47,7 +47,11 @@ class Reservation(Base, TimestampMixin):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=__import__("uuid").uuid4)
-    guest_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
+    guest_id: Mapped[UUID] = mapped_column(
+        ForeignKey("guests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     reservation_code: Mapped[str | None] = mapped_column(String(8), unique=True, nullable=True, index=True)
     branch_id: Mapped[UUID] = mapped_column(
         ForeignKey("branches.id", ondelete="CASCADE"),
@@ -73,6 +77,7 @@ class Reservation(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     qr_code_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    guest: Mapped["Guest"] = relationship("Guest", back_populates="reservations")
     branch: Mapped["Branch"] = relationship("Branch")
     table: Mapped["Table"] = relationship("Table", back_populates="reservations")
 

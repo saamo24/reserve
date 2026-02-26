@@ -76,6 +76,22 @@ class Settings(BaseSettings):
         alias="GUEST_COOKIE_MAX_AGE",
     )
 
+    # Telegram
+    tg_bot_token: str = Field(default="", alias="TG_BOT_TOKEN")
+    tg_bot_username: str = Field(default="", alias="TG_BOT_USERNAME")
+    telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
+    telegram_webhook_url: str = Field(default="", alias="TELEGRAM_WEBHOOK_URL")
+
+    # Celery
+    celery_broker_url: str = Field(
+        default="redis://localhost:6379/1",
+        alias="CELERY_BROKER_URL",
+    )
+    celery_result_backend: str = Field(
+        default="redis://localhost:6379/1",
+        alias="CELERY_RESULT_BACKEND",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
