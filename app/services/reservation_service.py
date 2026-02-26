@@ -122,10 +122,8 @@ class ReservationService:
             # Ensure guest exists (create if needed)
             await self._guest_repo.get_or_create(guest_id)
 
-            # Set status: PENDING if email provided, CONFIRMED otherwise
-            initial_status = (
-                ReservationStatus.PENDING if body.email else ReservationStatus.CONFIRMED
-            )
+            # Always PENDING on create; CONFIRMED only after user confirms via email or Telegram
+            initial_status = ReservationStatus.PENDING
 
             reservation_code = _generate_reservation_code()
             reservation = Reservation(

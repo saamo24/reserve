@@ -1,5 +1,6 @@
 """Telegram service for sending reservation notifications."""
 
+import base64
 from datetime import date, time
 from uuid import UUID
 
@@ -123,6 +124,49 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Failed to answer callback query {callback_query_id}: {e}", exc_info=True)
 
+    def _reservation_url(self, reservation: Reservation) -> str:
+        """Guest view-reservation URL (for Telegram message link)."""
+        base = self.settings.frontend_base_url.rstrip("/")
+        code = reservation.reservation_code or ""
+        return f"{base}/view-reservation?id={reservation.id}&code={code}"
+
+    async def send_photo(
+        self,
+        chat_id: int,
+        image_base64: str,
+        caption: str | None = None,
+    ) -> None:
+        """Send a photo to a Telegram chat (e.g. QR code). Decodes base64 and uses sendPhoto API."""
+        if not self.bot_token:
+            logger.warning("Telegram bot token not configured, skipping sendPhoto")
+            return
+        if not image_base64 or not image_base64.strip():
+            logger.warning("Skipping Telegram sendPhoto: image is empty")
+            return
+        try:
+            image_bytes = base64.b64decode(image_base64.strip())
+        except Exception as e:
+            logger.warning(f"Failed to decode base64 image for sendPhoto: {e}")
+            return
+        client = await self._get_client()
+        url = f"{self.base_url}/sendPhoto"
+        files = {"photo": ("qr.png", image_bytes, "image/png")}
+        data: dict = {"chat_id": chat_id}
+        if caption:
+            data["caption"] = caption
+            data["parse_mode"] = "HTML"
+        try:
+            response = await client.post(url, data=data, files=files)
+            response.raise_for_status()
+            logger.info(f"Telegram photo sent successfully to chat_id {chat_id}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                logger.error(f"Bad request to Telegram sendPhoto: {e.response.text}")
+            else:
+                logger.error(f"Failed to send Telegram photo to chat_id {chat_id}: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Unexpected error sending Telegram photo to chat_id {chat_id}: {e}", exc_info=True)
+
     def _format_reservation_confirmation_request(self, reservation: Reservation) -> str:
         """Format reservation confirmation request message in HTML (with buttons)."""
         date_str = (
@@ -139,6 +183,7 @@ class TelegramService:
         branch_name = reservation.branch.name if reservation.branch else "N/A"
         contact = reservation.phone_number if reservation.phone_number else "N/A"
 
+        view_url = self._reservation_url(reservation).replace("&", "&amp;")
         message = f"""📋 <b>Please confirm your reservation</b>
 
 📅 Date: {date_str}
@@ -146,7 +191,9 @@ class TelegramService:
 🏢 Branch: {branch_name}
 📞 Contact: {contact}
 
-Please confirm or cancel your reservation using the buttons below."""
+Please confirm or cancel your reservation using the buttons below.
+
+<a href="{view_url}">View reservation</a>"""
 
         return message
 
@@ -167,6 +214,7 @@ Please confirm or cancel your reservation using the buttons below."""
         branch_name = reservation.branch.name if reservation.branch else "N/A"
         contact = reservation.phone_number if reservation.phone_number else "N/A"
 
+        view_url = self._reservation_url(reservation).replace("&", "&amp;")
         message = f"""✅ <b>Reservation Confirmed</b>
 
 📅 Date: {date_str}
@@ -174,7 +222,9 @@ Please confirm or cancel your reservation using the buttons below."""
 🏢 Branch: {branch_name}
 📞 Contact: {contact}
 
-Reservation Code: <code>{code}</code>"""
+Reservation Code: <code>{code}</code>
+
+<a href="{view_url}">View reservation</a>"""
 
         if reservation.email:
             message += f"\n📧 Email: {reservation.email}"
@@ -232,10 +282,22 @@ Your reservation for {date_str} at {branch_name} has been cancelled."""
                 message,
                 reply_markup=keyboard,
             )
+            if reservation.qr_code_base64:
+                await self.send_photo(
+                    reservation.guest.tg_chat_id,
+                    reservation.qr_code_base64,
+                    caption="QR code for your reservation",
+                )
         else:
             # For already confirmed reservations, send confirmation message without buttons
             message = self._format_reservation_confirmation(reservation)
             await self.send_message(reservation.guest.tg_chat_id, message)
+            if reservation.qr_code_base64:
+                await self.send_photo(
+                    reservation.guest.tg_chat_id,
+                    reservation.qr_code_base64,
+                    caption="QR code for your reservation",
+                )
 
     async def send_reservation_cancellation(self, reservation: Reservation) -> None:
         """Send reservation cancellation message via Telegram."""
