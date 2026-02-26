@@ -57,12 +57,16 @@ class TelegramService:
             logger.warning("Telegram bot token not configured, skipping Telegram message")
             return
 
+        if not text or not text.strip():
+            logger.warning("Skipping Telegram sendMessage: message text is empty")
+            return
+
         client = await self._get_client()
         url = f"{self.base_url}/sendMessage"
 
         payload = {
             "chat_id": chat_id,
-            "text": text,
+            "text": text.strip(),
             "parse_mode": parse_mode,
         }
         if reply_markup:
@@ -122,17 +126,26 @@ class TelegramService:
 
     def _format_reservation_confirmation_request(self, reservation: Reservation) -> str:
         """Format reservation confirmation request message in HTML (with buttons)."""
-        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
-        start_time_str = reservation.start_time.strftime("%H:%M")
-        end_time_str = reservation.end_time.strftime("%H:%M")
+        date_str = (
+            reservation.reservation_date.strftime("%Y-%m-%d")
+            if reservation.reservation_date
+            else "N/A"
+        )
+        start_time_str = (
+            reservation.start_time.strftime("%H:%M") if reservation.start_time else "N/A"
+        )
+        end_time_str = (
+            reservation.end_time.strftime("%H:%M") if reservation.end_time else "N/A"
+        )
         branch_name = reservation.branch.name if reservation.branch else "N/A"
+        contact = reservation.phone_number if reservation.phone_number else "N/A"
 
         message = f"""📋 <b>Please confirm your reservation</b>
 
 📅 Date: {date_str}
 🕐 Time: {start_time_str} - {end_time_str}
 🏢 Branch: {branch_name}
-📞 Contact: {reservation.phone_number}
+📞 Contact: {contact}
 
 Please confirm or cancel your reservation using the buttons below."""
 
@@ -140,17 +153,27 @@ Please confirm or cancel your reservation using the buttons below."""
 
     def _format_reservation_confirmation(self, reservation: Reservation) -> str:
         """Format reservation confirmation message in HTML (after user confirmed)."""
-        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
-        start_time_str = reservation.start_time.strftime("%H:%M")
-        end_time_str = reservation.end_time.strftime("%H:%M")
+        date_str = (
+            reservation.reservation_date.strftime("%Y-%m-%d")
+            if reservation.reservation_date
+            else "N/A"
+        )
+        start_time_str = (
+            reservation.start_time.strftime("%H:%M") if reservation.start_time else "N/A"
+        )
+        end_time_str = (
+            reservation.end_time.strftime("%H:%M") if reservation.end_time else "N/A"
+        )
         code = reservation.reservation_code or "N/A"
+        branch_name = reservation.branch.name if reservation.branch else "N/A"
+        contact = reservation.phone_number if reservation.phone_number else "N/A"
 
         message = f"""✅ <b>Reservation Confirmed</b>
 
 📅 Date: {date_str}
 🕐 Time: {start_time_str} - {end_time_str}
-🏢 Branch: {reservation.branch.name if reservation.branch else 'N/A'}
-📞 Contact: {reservation.phone_number}
+🏢 Branch: {branch_name}
+📞 Contact: {contact}
 
 Reservation Code: <code>{code}</code>"""
 
@@ -161,7 +184,11 @@ Reservation Code: <code>{code}</code>"""
 
     def _format_reservation_cancellation(self, reservation: Reservation) -> str:
         """Format reservation cancellation message in HTML."""
-        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
+        date_str = (
+            reservation.reservation_date.strftime("%Y-%m-%d")
+            if reservation.reservation_date
+            else "N/A"
+        )
         branch_name = reservation.branch.name if reservation.branch else "N/A"
 
         message = f"""❌ <b>Reservation Cancelled</b>
