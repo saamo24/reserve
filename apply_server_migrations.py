@@ -43,16 +43,30 @@ def check_prerequisites():
     
     return True
 
+def normalize_database_url(url: str) -> str:
+    """Ensure URL uses asyncpg driver for Alembic (postgresql:// -> postgresql+asyncpg://)."""
+    if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        return "postgresql+asyncpg://" + url[len("postgresql://") :]
+    return url
+
+
 def get_server_database_url():
-    """Get the server database URL from environment."""
+    """Get the server database URL from command-line argument or environment."""
+    # Allow URL as first command-line argument: ./apply_server_migrations.py "postgresql://..."
+    if len(sys.argv) >= 2 and sys.argv[1].strip():
+        database_url = normalize_database_url(sys.argv[1].strip())
+        logger.info(f"✓ Using database URL from command line: {database_url.split('@')[1] if '@' in database_url else '***'}")
+        return database_url
+
     database_url = os.getenv('DATABASE_URL')
-    
     if not database_url:
         logger.error("Could not find DATABASE_URL in environment variables")
-        logger.error("Please set DATABASE_URL environment variable with the server database connection string")
+        logger.error("Pass the URL as an argument: ./apply_server_migrations.py 'postgresql://user:pass@host/db'")
+        logger.error("Or set DATABASE_URL environment variable")
         return None
-    
-    logger.info(f"✓ Database URL found: {database_url.split('@')[1] if '@' in database_url else '***'}")
+
+    database_url = normalize_database_url(database_url)
+    logger.info(f"✓ Database URL found (env): {database_url.split('@')[1] if '@' in database_url else '***'}")
     return database_url
 
 def run_migration_command(command, database_url):

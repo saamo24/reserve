@@ -237,7 +237,7 @@ class ReservationService:
         await self._reservation_repo.update(reservation)
         await self._session.commit()
         return await self._reservation_repo.get_by_id(
-            reservation_id, load_branch=True, load_table=True
+            reservation_id, load_branch=True, load_table=True, load_guest=True
         )
 
     async def attach_to_guest_by_id(
@@ -253,7 +253,7 @@ class ReservationService:
         await self._reservation_repo.update(reservation)
         await self._session.commit()
         return await self._reservation_repo.get_by_id(
-            reservation_id, load_branch=True, load_table=True
+            reservation_id, load_branch=True, load_table=True, load_guest=True
         )
 
     async def list_my_reservations(

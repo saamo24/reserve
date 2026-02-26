@@ -281,6 +281,11 @@ async def _handle_start_command(
                     "✅ Account linked successfully! You'll now receive reservation updates here via Telegram."
                 )
                 logger.info(f"Linked guest {reservation.guest_id} to Telegram chat_id {chat_id} via /start command")
+                # Send full reservation details (reload with branch/table for formatting)
+                reservation = await reservation_repo.get_by_id(
+                    reservation.id, load_branch=True, load_table=True, load_guest=True
+                )
+                await telegram_service.send_reservation_confirmation(reservation)
         except Exception as e:
             await telegram_service.send_message(
                 chat_id,

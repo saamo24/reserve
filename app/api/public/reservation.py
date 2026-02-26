@@ -11,6 +11,7 @@ from app.schemas.reservation import ReservationCreate, ReservationResponsePublic
 from app.services import ConflictError, LockedError, NotFoundError
 from app.services.reservation_service import ReservationService
 from app.services.locking_service import LockingService
+from app.services.tg_service import TelegramService
 from app.services.caching_service import CachingService
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.guest_repository import GuestRepository
@@ -82,6 +83,20 @@ async def attach_reservation_to_guest(
     reservation = await service.attach_to_guest(reservation_id, code, guest_id)
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found or invalid code")
+    # Send Telegram confirmation now that reservation is linked to a guest with tg_chat_id
+    if reservation.guest and reservation.guest.tg_chat_id:
+        telegram_service = TelegramService()
+        try:
+            await telegram_service.send_reservation_confirmation(reservation)
+        except Exception as e:
+            logger.warning(
+                "Failed to send Telegram confirmation after attach for reservation %s: %s",
+                reservation_id,
+                e,
+                exc_info=True,
+            )
+        finally:
+            await telegram_service.close()
     return reservation
 
 
@@ -99,6 +114,19 @@ async def dev_attach_reservation_to_guest(
     reservation = await service.attach_to_guest_by_id(reservation_id, guest_id)
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.guest and reservation.guest.tg_chat_id:
+        telegram_service = TelegramService()
+        try:
+            await telegram_service.send_reservation_confirmation(reservation)
+        except Exception as e:
+            logger.warning(
+                "Failed to send Telegram confirmation after dev attach for reservation %s: %s",
+                reservation_id,
+                e,
+                exc_info=True,
+            )
+        finally:
+            await telegram_service.close()
     return reservation
 
 
