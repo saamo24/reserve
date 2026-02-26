@@ -53,6 +53,16 @@ def _reservation_service(db: DbSession, redis: RedisDep) -> ReservationService:
     )
 
 
+def _parse_reservation_id_from_callback(token: str) -> UUID | None:
+    """Parse callback_data token as UUID (Telegram short format); return None if not a valid UUID."""
+    if len(token) != 36:
+        return None
+    try:
+        return UUID(token)
+    except (ValueError, TypeError):
+        return None
+
+
 async def _handle_confirm_callback(
     callback_query_id: str,
     chat_id: int,
@@ -64,19 +74,22 @@ async def _handle_confirm_callback(
     telegram_service = TelegramService()
 
     try:
-        # Verify token
-        reservation_id = verify_reservation_token(token, "confirm")
-        if reservation_id is None:
-            await telegram_service.answer_callback_query(
-                callback_query_id,
-                text="❌ Invalid or expired confirmation token",
-                show_alert=True,
-            )
-            return
-
-        # Load and confirm reservation
         service = _reservation_service(db, redis)
-        reservation = await service.confirm_reservation(reservation_id, token)
+        reservation_id = _parse_reservation_id_from_callback(token)
+        if reservation_id is not None:
+            # Telegram short format: callback_data is reservation UUID; verify by chat_id
+            reservation = await service.confirm_reservation_by_telegram(reservation_id, chat_id)
+        else:
+            # Backward compat: JWT token (e.g. old messages)
+            reservation_id = verify_reservation_token(token, "confirm")
+            if reservation_id is None:
+                await telegram_service.answer_callback_query(
+                    callback_query_id,
+                    text="❌ Invalid or expired confirmation token",
+                    show_alert=True,
+                )
+                return
+            reservation = await service.confirm_reservation(reservation_id, token)
 
         if reservation is None:
             await telegram_service.answer_callback_query(
@@ -136,19 +149,22 @@ async def _handle_cancel_callback(
     telegram_service = TelegramService()
 
     try:
-        # Verify token
-        reservation_id = verify_reservation_token(token, "cancel")
-        if reservation_id is None:
-            await telegram_service.answer_callback_query(
-                callback_query_id,
-                text="❌ Invalid or expired cancellation token",
-                show_alert=True,
-            )
-            return
-
-        # Load and cancel reservation
         service = _reservation_service(db, redis)
-        reservation = await service.cancel_reservation(reservation_id, token)
+        reservation_id = _parse_reservation_id_from_callback(token)
+        if reservation_id is not None:
+            # Telegram short format: callback_data is reservation UUID; verify by chat_id
+            reservation = await service.cancel_reservation_by_telegram(reservation_id, chat_id)
+        else:
+            # Backward compat: JWT token (e.g. old messages)
+            reservation_id = verify_reservation_token(token, "cancel")
+            if reservation_id is None:
+                await telegram_service.answer_callback_query(
+                    callback_query_id,
+                    text="❌ Invalid or expired cancellation token",
+                    show_alert=True,
+                )
+                return
+            reservation = await service.cancel_reservation(reservation_id, token)
 
         if reservation is None:
             await telegram_service.answer_callback_query(

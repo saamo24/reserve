@@ -8,7 +8,6 @@ import httpx
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.reservation import Reservation, ReservationStatus
-from app.utils.tokens import create_reservation_token
 
 logger = get_logger(__name__)
 
@@ -216,17 +215,13 @@ Your reservation for {date_str} at {branch_name} has been cancelled."""
             return
 
         # For PENDING reservations, send confirmation request with buttons
+        # callback_data is limited to 64 bytes; use reservation UUID (not JWT)
         if reservation.status == ReservationStatus.PENDING:
-            # Generate tokens for confirm and cancel actions
-            confirm_token = create_reservation_token(reservation.id, "confirm")
-            cancel_token = create_reservation_token(reservation.id, "cancel")
-
-            # Create inline keyboard with buttons
             keyboard = {
                 "inline_keyboard": [
                     [
-                        {"text": "✅ Confirm", "callback_data": f"confirm:{confirm_token}"},
-                        {"text": "❌ Cancel", "callback_data": f"cancel:{cancel_token}"},
+                        {"text": "✅ Confirm", "callback_data": f"confirm:{reservation.id}"},
+                        {"text": "❌ Cancel", "callback_data": f"cancel:{reservation.id}"},
                     ]
                 ]
             }

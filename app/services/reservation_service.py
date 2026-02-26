@@ -370,6 +370,64 @@ class ReservationService:
 
         return reservation
 
+    async def confirm_reservation_by_telegram(
+        self, reservation_id: UUID, chat_id: int
+    ) -> Reservation | None:
+        """Confirm a reservation via Telegram; verify by guest tg_chat_id."""
+        reservation = await self._reservation_repo.get_by_id(
+            reservation_id, load_branch=True, load_table=True, load_guest=True
+        )
+        if reservation is None:
+            return None
+        if not reservation.guest or reservation.guest.tg_chat_id != chat_id:
+            return None
+        if reservation.status != ReservationStatus.PENDING:
+            raise ValueError(f"Cannot confirm reservation with status {reservation.status.value}")
+
+        reservation.status = ReservationStatus.CONFIRMED
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+
+        await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
+        await self._caching.invalidate_tables(reservation.branch_id)
+
+        return await self._reservation_repo.get_by_id(
+            reservation.id, load_branch=True, load_table=True, load_guest=True
+        )
+
+    async def cancel_reservation_by_telegram(
+        self, reservation_id: UUID, chat_id: int
+    ) -> Reservation | None:
+        """Cancel a reservation via Telegram; verify by guest tg_chat_id."""
+        reservation = await self._reservation_repo.get_by_id(
+            reservation_id, load_branch=True, load_table=True, load_guest=True
+        )
+        if reservation is None:
+            return None
+        if not reservation.guest or reservation.guest.tg_chat_id != chat_id:
+            return None
+        if reservation.status != ReservationStatus.PENDING:
+            raise ValueError(f"Cannot cancel reservation with status {reservation.status.value}")
+
+        old_status = reservation.status
+        reservation.status = ReservationStatus.CANCELLED
+        await self._reservation_repo.update(reservation)
+        await self._session.commit()
+
+        await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
+        await self._caching.invalidate_tables(reservation.branch_id)
+
+        reservation = await self._reservation_repo.get_by_id(
+            reservation.id, load_branch=True, load_table=True, load_guest=True
+        )
+
+        from app.tasks.notifications import send_reservation_cancelled_notification
+        send_reservation_cancelled_notification.delay(
+            str(reservation.id), old_status.value if old_status else None
+        )
+
+        return reservation
+
     async def list_with_filters(
         self,
         *,
