@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.api.deps import DbSession, RedisDep
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.models.reservation import ReservationStatus
 from app.repositories.reservation_repository import ReservationRepository
 from app.services.reservation_service import ReservationService
 from app.services.locking_service import LockingService
@@ -281,10 +282,14 @@ async def _handle_start_command(
                     "✅ Account linked successfully! You'll now receive reservation updates here via Telegram."
                 )
                 logger.info(f"Linked guest {reservation.guest_id} to Telegram chat_id {chat_id} via /start command")
-                # Send full reservation details (reload with branch/table for formatting)
+                # Reload with branch/table for formatting; same as email: PENDING until user confirms/cancels in TG
                 reservation = await reservation_repo.get_by_id(
                     reservation.id, load_branch=True, load_table=True, load_guest=True
                 )
+                if reservation.status == ReservationStatus.CONFIRMED:
+                    reservation.status = ReservationStatus.PENDING
+                    await reservation_repo.update(reservation)
+                    await db.commit()
                 await telegram_service.send_reservation_confirmation(reservation)
         except Exception as e:
             await telegram_service.send_message(
