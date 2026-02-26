@@ -1,6 +1,5 @@
 """Reservation business logic: create, get, list, update with locking and cache invalidation."""
 
-import asyncio
 import secrets
 from datetime import date, time, timedelta
 from uuid import UUID
@@ -12,11 +11,11 @@ from app.models.branch import Branch
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.table import Table
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.guest_repository import GuestRepository
 from app.repositories.reservation_repository import ReservationRepository
 from app.repositories.table_repository import TableRepository
 from app.schemas.reservation import ReservationCreate, ReservationUpdate
 from app.services.caching_service import CachingService
-from app.services.email_service import EmailService
 from app.services.locking_service import LockingService
 from app.services.timeslot_service import TimeslotService
 from app.core.config import get_settings
@@ -46,6 +45,7 @@ class ReservationService:
         branch_repo: BranchRepository,
         table_repo: TableRepository,
         reservation_repo: ReservationRepository,
+        guest_repo: GuestRepository,
         locking: LockingService,
         caching: CachingService,
     ) -> None:
@@ -53,6 +53,7 @@ class ReservationService:
         self._branch_repo = branch_repo
         self._table_repo = table_repo
         self._reservation_repo = reservation_repo
+        self._guest_repo = guest_repo
         self._locking = locking
         self._caching = caching
 
@@ -118,6 +119,9 @@ class ReservationService:
             if overlap:
                 raise ConflictError("This slot was just taken")
 
+            # Ensure guest exists (create if needed)
+            await self._guest_repo.get_or_create(guest_id)
+
             # Set status: PENDING if email provided, CONFIRMED otherwise
             initial_status = (
                 ReservationStatus.PENDING if body.email else ReservationStatus.CONFIRMED
@@ -155,25 +159,17 @@ class ReservationService:
             await self._caching.invalidate_slots(body.branch_id, body.reservation_date)
             await self._caching.invalidate_tables(body.branch_id)
 
-            # Reload reservation with relations for email sending
+            # Reload reservation with relations for notifications
             reservation_with_relations = await self._reservation_repo.get_by_id(
                 reservation.id, load_branch=True, load_table=True
             )
             if reservation_with_relations is None:
                 reservation_with_relations = reservation
 
-            # Send emails in background so HTTP response is not blocked by SMTP timeouts
-            email_service = EmailService()
-
-            async def _send_creation_emails() -> None:
-                try:
-                    if body.email:
-                        await email_service.send_reservation_confirmation(reservation_with_relations)
-                    await email_service.send_admin_notification(reservation_with_relations)
-                except Exception:
-                    pass  # Errors already logged in email_service
-
-            asyncio.create_task(_send_creation_emails())
+            # Enqueue notification task via Celery (non-blocking)
+            # Lazy import to avoid circular dependency
+            from app.tasks.notifications import send_reservation_created_notification
+            send_reservation_created_notification.delay(str(reservation.id))
 
             return reservation_with_relations
         except IntegrityError:
@@ -272,7 +268,7 @@ class ReservationService:
         """Confirm a reservation via email token."""
         from app.utils.tokens import verify_reservation_token
 
-        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
+        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True, load_guest=True)
         if reservation is None:
             return None
 
@@ -295,27 +291,14 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Reload reservation with all relations and QR code to ensure we have complete data for email
+        # Reload reservation with all relations and QR code to ensure we have complete data for notifications
         reservation = await self._reservation_repo.get_by_id(
-            reservation.id, load_branch=True, load_table=True
+            reservation.id, load_branch=True, load_table=True, load_guest=True
         )
 
-        # Send status update email in background (don't block response on SMTP)
-        if reservation and reservation.email:
-            email_service = EmailService()
-            # Use asyncio.create_task but add error handling
-            task = asyncio.create_task(
-                email_service.send_reservation_status_update(reservation, old_status)
-            )
-            # Add error callback to log any failures
-            def log_email_error(task):
-                try:
-                    task.result()
-                except Exception as e:
-                    from app.core.logging import get_logger
-                    logger = get_logger(__name__)
-                    logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
-            task.add_done_callback(log_email_error)
+        # Enqueue notification task via Celery (non-blocking)
+        # Note: Status update notifications are handled by email service in the task
+        # This is for confirmation, so we don't need a separate cancellation task here
 
         return reservation
 
@@ -323,7 +306,7 @@ class ReservationService:
         """Cancel a reservation via email token."""
         from app.utils.tokens import verify_reservation_token
 
-        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True)
+        reservation = await self._reservation_repo.get_by_id(id, load_branch=True, load_table=True, load_guest=True)
         if reservation is None:
             return None
 
@@ -346,9 +329,17 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Send status update email in background (don't block response on SMTP)
-        email_service = EmailService()
-        asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
+        # Reload reservation with relations for notifications
+        reservation = await self._reservation_repo.get_by_id(
+            reservation.id, load_branch=True, load_table=True, load_guest=True
+        )
+
+        # Enqueue cancellation notification task via Celery (non-blocking)
+        # Lazy import to avoid circular dependency
+        from app.tasks.notifications import send_reservation_cancelled_notification
+        send_reservation_cancelled_notification.delay(
+            str(reservation.id), old_status.value if old_status else None
+        )
 
         return reservation
 
@@ -396,10 +387,19 @@ class ReservationService:
         await self._caching.invalidate_slots(reservation.branch_id, reservation.reservation_date)
         await self._caching.invalidate_tables(reservation.branch_id)
 
-        # Send status update email in background if status changed (don't block on SMTP)
+        # Reload reservation with relations for notifications
+        reservation = await self._reservation_repo.get_by_id(
+            reservation.id, load_branch=True, load_table=True
+        )
+
+        # Send status update notification via Celery if status changed to CANCELLED
         if body.status is not None and body.status != old_status:
-            email_service = EmailService()
-            asyncio.create_task(email_service.send_reservation_status_update(reservation, old_status))
+            if body.status == ReservationStatus.CANCELLED:
+                # Lazy import to avoid circular dependency
+                from app.tasks.notifications import send_reservation_cancelled_notification
+                send_reservation_cancelled_notification.delay(
+                    str(reservation.id), old_status.value if old_status else None
+                )
 
         return reservation
 

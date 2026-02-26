@@ -11,6 +11,7 @@ from starlette.responses import Response
 from app.api.admin import admin_router as admin_router
 from app.api.auth import router as auth_router
 from app.api.public import public_router as public_router
+from app.api.telegram.webhook import router as telegram_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.redis import close_redis, get_redis
@@ -105,6 +106,7 @@ app.add_middleware(GuestMiddleware)
 app.include_router(auth_router)
 app.include_router(admin_router, prefix="/admin")
 app.include_router(public_router)
+app.include_router(telegram_router)
 
 
 

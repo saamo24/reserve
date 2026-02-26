@@ -13,6 +13,7 @@ from app.services.reservation_service import ReservationService
 from app.services.locking_service import LockingService
 from app.services.caching_service import CachingService
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.guest_repository import GuestRepository
 from app.repositories.table_repository import TableRepository
 from app.repositories.reservation_repository import ReservationRepository
 
@@ -26,6 +27,7 @@ def _reservation_service(db: DbSession, redis: RedisDep) -> ReservationService:
         branch_repo=BranchRepository(db),
         table_repo=TableRepository(db),
         reservation_repo=ReservationRepository(db),
+        guest_repo=GuestRepository(db),
         locking=LockingService(redis),
         caching=CachingService(redis),
     )

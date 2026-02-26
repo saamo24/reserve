@@ -1,0 +1,233 @@
+"""Telegram service for sending reservation notifications."""
+
+from datetime import date, time
+from uuid import UUID
+
+import httpx
+
+from app.core.config import get_settings
+from app.core.logging import get_logger
+from app.models.reservation import Reservation, ReservationStatus
+from app.utils.tokens import create_reservation_token
+
+logger = get_logger(__name__)
+
+
+class TelegramService:
+    """Service for sending Telegram notifications via Bot API."""
+
+    def __init__(self) -> None:
+        self.settings = get_settings()
+        self.bot_token = self.settings.tg_bot_token
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self._client: httpx.AsyncClient | None = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create httpx async client."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=30.0)
+        return self._client
+
+    async def close(self) -> None:
+        """Close the httpx client."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        parse_mode: str = "HTML",
+        reply_markup: dict | None = None,
+    ) -> None:
+        """
+        Send a message to a Telegram chat.
+
+        Args:
+            chat_id: Telegram chat ID
+            text: Message text (HTML formatted)
+            parse_mode: Parse mode (default: HTML)
+            reply_markup: Optional inline keyboard markup
+
+        Raises:
+            httpx.HTTPStatusError: If API request fails
+        """
+        if not self.bot_token:
+            logger.warning("Telegram bot token not configured, skipping Telegram message")
+            return
+
+        client = await self._get_client()
+        url = f"{self.base_url}/sendMessage"
+
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": parse_mode,
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
+        try:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            logger.info(f"Telegram message sent successfully to chat_id {chat_id}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                logger.error(f"Bad request to Telegram API: {e.response.text}")
+            elif e.response.status_code == 403:
+                logger.warning(f"Bot blocked by user (chat_id {chat_id})")
+            elif e.response.status_code == 429:
+                logger.warning(f"Telegram API rate limit exceeded for chat_id {chat_id}")
+            else:
+                logger.error(f"Failed to send Telegram message to chat_id {chat_id}: {e}", exc_info=True)
+            # Don't raise - Telegram failures shouldn't break the reservation flow
+        except Exception as e:
+            logger.error(f"Unexpected error sending Telegram message to chat_id {chat_id}: {e}", exc_info=True)
+            # Don't raise - Telegram failures shouldn't break the reservation flow
+
+    async def answer_callback_query(
+        self,
+        callback_query_id: str,
+        text: str | None = None,
+        show_alert: bool = False,
+    ) -> None:
+        """
+        Answer a callback query from an inline keyboard button.
+
+        Args:
+            callback_query_id: The callback query ID from Telegram
+            text: Optional text to show to the user
+            show_alert: If True, show as alert; if False, show as notification
+        """
+        if not self.bot_token:
+            return
+
+        client = await self._get_client()
+        url = f"{self.base_url}/answerCallbackQuery"
+
+        payload = {
+            "callback_query_id": callback_query_id,
+        }
+        if text:
+            payload["text"] = text
+        if show_alert:
+            payload["show_alert"] = True
+
+        try:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Failed to answer callback query {callback_query_id}: {e}", exc_info=True)
+
+    def _format_reservation_confirmation_request(self, reservation: Reservation) -> str:
+        """Format reservation confirmation request message in HTML (with buttons)."""
+        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
+        start_time_str = reservation.start_time.strftime("%H:%M")
+        end_time_str = reservation.end_time.strftime("%H:%M")
+        branch_name = reservation.branch.name if reservation.branch else "N/A"
+
+        message = f"""📋 <b>Please confirm your reservation</b>
+
+📅 Date: {date_str}
+🕐 Time: {start_time_str} - {end_time_str}
+🏢 Branch: {branch_name}
+📞 Contact: {reservation.phone_number}
+
+Please confirm or cancel your reservation using the buttons below."""
+
+        return message
+
+    def _format_reservation_confirmation(self, reservation: Reservation) -> str:
+        """Format reservation confirmation message in HTML (after user confirmed)."""
+        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
+        start_time_str = reservation.start_time.strftime("%H:%M")
+        end_time_str = reservation.end_time.strftime("%H:%M")
+        code = reservation.reservation_code or "N/A"
+
+        message = f"""✅ <b>Reservation Confirmed</b>
+
+📅 Date: {date_str}
+🕐 Time: {start_time_str} - {end_time_str}
+🏢 Branch: {reservation.branch.name if reservation.branch else 'N/A'}
+📞 Contact: {reservation.phone_number}
+
+Reservation Code: <code>{code}</code>"""
+
+        if reservation.email:
+            message += f"\n📧 Email: {reservation.email}"
+
+        return message
+
+    def _format_reservation_cancellation(self, reservation: Reservation) -> str:
+        """Format reservation cancellation message in HTML."""
+        date_str = reservation.reservation_date.strftime("%Y-%m-%d")
+        branch_name = reservation.branch.name if reservation.branch else "N/A"
+
+        message = f"""❌ <b>Reservation Cancelled</b>
+
+Your reservation for {date_str} at {branch_name} has been cancelled."""
+
+        return message
+
+    async def send_reservation_confirmation(self, reservation: Reservation) -> None:
+        """
+        Send reservation confirmation message via Telegram.
+        For PENDING reservations, includes inline keyboard buttons for confirm/cancel.
+        For CONFIRMED reservations, sends confirmation message without buttons.
+        """
+        if not reservation.guest:
+            logger.info(f"Skipping Telegram confirmation for reservation {reservation.id}: guest not loaded")
+            return
+        
+        if not reservation.guest.tg_chat_id:
+            logger.info(f"Skipping Telegram confirmation for reservation {reservation.id}: guest_id={reservation.guest_id} has no tg_chat_id")
+            return
+        
+        if not self.bot_token:
+            logger.warning(f"Telegram bot token not configured (TG_BOT_TOKEN empty), skipping Telegram message for reservation {reservation.id}")
+            return
+
+        # For PENDING reservations, send confirmation request with buttons
+        if reservation.status == ReservationStatus.PENDING:
+            # Generate tokens for confirm and cancel actions
+            confirm_token = create_reservation_token(reservation.id, "confirm")
+            cancel_token = create_reservation_token(reservation.id, "cancel")
+
+            # Create inline keyboard with buttons
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Confirm", "callback_data": f"confirm:{confirm_token}"},
+                        {"text": "❌ Cancel", "callback_data": f"cancel:{cancel_token}"},
+                    ]
+                ]
+            }
+
+            message = self._format_reservation_confirmation_request(reservation)
+            await self.send_message(
+                reservation.guest.tg_chat_id,
+                message,
+                reply_markup=keyboard,
+            )
+        else:
+            # For already confirmed reservations, send confirmation message without buttons
+            message = self._format_reservation_confirmation(reservation)
+            await self.send_message(reservation.guest.tg_chat_id, message)
+
+    async def send_reservation_cancellation(self, reservation: Reservation) -> None:
+        """Send reservation cancellation message via Telegram."""
+        if not reservation.guest:
+            logger.info(f"Skipping Telegram cancellation for reservation {reservation.id}: guest not loaded")
+            return
+        
+        if not reservation.guest.tg_chat_id:
+            logger.info(f"Skipping Telegram cancellation for reservation {reservation.id}: guest_id={reservation.guest_id} has no tg_chat_id")
+            return
+        
+        if not self.bot_token:
+            logger.warning(f"Telegram bot token not configured (TG_BOT_TOKEN empty), skipping Telegram message for reservation {reservation.id}")
+            return
+
+        message = self._format_reservation_cancellation(reservation)
+        await self.send_message(reservation.guest.tg_chat_id, message)

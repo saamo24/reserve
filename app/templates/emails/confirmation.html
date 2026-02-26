@@ -67,6 +67,24 @@
                         </td>
                     </tr>
 
+                    <!-- Telegram Link -->
+                    {% if telegram_bot_url %}
+                    <tr>
+                        <td align="center" style="padding-top:20px;">
+                            <p style="color:#6b7280;font-size:14px;margin:0 0 10px 0;">
+                                📱 Get updates on Telegram:
+                            </p>
+                            <a href="{{ telegram_bot_url }}"
+                               style="background:#0088cc;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;font-size:14px;display:inline-block;margin:8px;">
+                                💬 Open Telegram Bot
+                            </a>
+                            <p style="color:#9ca3af;font-size:12px;margin:10px 0 0 0;">
+                                Click to link your account and receive reservation updates via Telegram
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
                     <!-- Backup Links -->
                     <tr>
                         <td style="padding-top:20px;font-size:12px;color:#6b7280;">
