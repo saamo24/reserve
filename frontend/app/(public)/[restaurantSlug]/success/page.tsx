@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getReservation, attachReservationToGuest } from '@/lib/api';
+import { getReservation, attachReservationToGuest, getGuestMe } from '@/lib/api';
 import { ReservationResponse } from '@/lib/types';
 import { formatDateDisplay, formatTime } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,8 @@ export default function SuccessPage() {
 
   const [reservation, setReservation] = useState<ReservationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showTelegramPopup, setShowTelegramPopup] = useState(false);
+  const [tgBotUsername, setTgBotUsername] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchReservation() {
@@ -41,6 +43,19 @@ export default function SuccessPage() {
           } catch {
             // Already attached or other
           }
+        }
+        try {
+          const guestMe = await getGuestMe();
+          setTgBotUsername(guestMe.tg_bot_username);
+          if (
+            !guestMe.telegram_linked &&
+            guestMe.tg_bot_username &&
+            data.reservation_code
+          ) {
+            setShowTelegramPopup(true);
+          }
+        } catch {
+          // Guest me optional; ignore
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load reservation';
@@ -67,9 +82,49 @@ export default function SuccessPage() {
     return null;
   }
 
+  const telegramBotLink =
+    tgBotUsername && reservation?.reservation_code
+      ? `https://t.me/${tgBotUsername}?start=${reservation.reservation_code}`
+      : null;
+
   return (
     <>
       <Navbar />
+      {showTelegramPopup && telegramBotLink && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="telegram-popup-title"
+        >
+          <Card variant="elevated" className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <CardTitle id="telegram-popup-title" className="text-lg">
+                Get reservation updates in Telegram
+              </CardTitle>
+              <p className="text-sm text-secondary-600 mt-1">
+                Open the bot to link your account and receive confirmations and reminders.
+              </p>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={() => window.open(telegramBotLink, '_blank', 'noopener,noreferrer')}
+              >
+                Open Telegram
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowTelegramPopup(false)}
+              >
+                Maybe later
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
         <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12">
           <Card variant="elevated">

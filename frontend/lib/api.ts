@@ -6,6 +6,7 @@ import type {
   TableResponse,
   TableCreate,
   TableUpdate,
+  GuestMeResponse,
   ReservationResponse,
   ReservationCreate,
   ReservationUpdate,
@@ -128,6 +129,11 @@ export async function getReservedTableIds(
   return data;
 }
 
+
+export async function getGuestMe(): Promise<GuestMeResponse> {
+  const { data } = await api.get<GuestMeResponse>('/guest/me');
+  return data;
+}
 
 export async function createReservation(body: ReservationCreate): Promise<ReservationResponse> {
   const { data } = await api.post<ReservationResponse>('/reservations', body);

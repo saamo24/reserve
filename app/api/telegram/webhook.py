@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.api.deps import DbSession, RedisDep
@@ -111,6 +111,14 @@ async def _handle_confirm_callback(
         # Send confirmation message
         confirmation_message = telegram_service._format_reservation_confirmation(reservation)
         await telegram_service.send_message(chat_id, confirmation_message)
+
+        # Send QR code only after user confirms (not with initial PENDING message)
+        if reservation.qr_code_base64:
+            await telegram_service.send_photo(
+                chat_id,
+                reservation.qr_code_base64,
+                caption="QR code for your reservation",
+            )
 
         # Answer callback query
         await telegram_service.answer_callback_query(

@@ -38,6 +38,11 @@ export interface TableResponse {
   updated_at: string;
 }
 
+export interface GuestMeResponse {
+  telegram_linked: boolean;
+  tg_bot_username: string | null;
+}
+
 export interface ReservationResponse {
   id: string;
   branch_id: string;

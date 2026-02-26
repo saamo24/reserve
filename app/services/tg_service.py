@@ -282,12 +282,7 @@ Your reservation for {date_str} at {branch_name} has been cancelled."""
                 message,
                 reply_markup=keyboard,
             )
-            if reservation.qr_code_base64:
-                await self.send_photo(
-                    reservation.guest.tg_chat_id,
-                    reservation.qr_code_base64,
-                    caption="QR code for your reservation",
-                )
+            # QR code is sent only after user confirms (in webhook), not with PENDING request
         else:
             # For already confirmed reservations, send confirmation message without buttons
             message = self._format_reservation_confirmation(reservation)
