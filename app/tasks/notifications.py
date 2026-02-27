@@ -7,7 +7,6 @@ from app.core.celery_app import celery_app
 from app.core.database import async_session_factory
 from app.core.logging import get_logger
 from app.models.reservation import Reservation
-from app.repositories.guest_repository import GuestRepository
 from app.repositories.reservation_repository import ReservationRepository
 from app.services.email_service import EmailService
 from app.services.notification_service import NotificationService
@@ -57,13 +56,13 @@ def send_reservation_created_notification(self, reservation_id: str) -> None:
         reservation_uuid = UUID(reservation_id)
         async with async_session_factory() as session:
             try:
-                # Load reservation with all relations including guest
+                # Load reservation with branch and table (no need for guest relationship)
                 reservation_repo = ReservationRepository(session)
                 reservation = await reservation_repo.get_by_id(
                     reservation_uuid,
                     load_branch=True,
                     load_table=True,
-                    load_guest=True,
+                    load_guest=False,  # Don't need guest relationship - identify by phone number
                 )
 
                 if reservation is None:
@@ -71,58 +70,30 @@ def send_reservation_created_notification(self, reservation_id: str) -> None:
                     return
 
                 # Log reservation details for debugging
-                logger.info(f"Processing notification for reservation {reservation_id}: guest_id={reservation.guest_id if reservation.guest_id else 'None'}, "
-                           f"guest_loaded={reservation.guest is not None}, "
-                           f"tg_chat_id={reservation.guest.tg_chat_id if reservation.guest else 'N/A'}")
+                logger.info(
+                    f"Processing notification for reservation {reservation_id}: "
+                    f"phone_number={reservation.phone_number}, status={reservation.status.value}"
+                )
 
-                # Refresh guest relationship to ensure we have the latest tg_chat_id
-                # This is important because the guest might have been linked to Telegram after reservation creation
-                if reservation.guest:
-                    try:
-                        await session.refresh(reservation.guest)
-                        logger.info(
-                            f"Refreshed guest relationship for reservation {reservation_id}: "
-                            f"guest_id={reservation.guest_id}, tg_chat_id={reservation.guest.tg_chat_id}"
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to refresh guest relationship for reservation {reservation_id}: {e}"
-                        )
+                # Find tg_chat_id by phone number (identify user by phone, not guest_id)
+                logger.info(
+                    f"Searching for tg_chat_id by phone number {reservation.phone_number} "
+                    f"for reservation {reservation_id}"
+                )
+                tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
+                    reservation.phone_number
+                )
 
-                # If guest doesn't have tg_chat_id, try to find it by phone number
-                if reservation.guest and not reservation.guest.tg_chat_id:
+                if tg_chat_id:
                     logger.info(
-                        f"Guest {reservation.guest_id} has no tg_chat_id, "
-                        f"searching for linked guest by phone number {reservation.phone_number}"
+                        f"Found tg_chat_id {tg_chat_id} for phone number {reservation.phone_number} "
+                        f"for reservation {reservation_id}"
                     )
-                    found_tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
-                        reservation.phone_number
+                else:
+                    logger.info(
+                        f"No linked Telegram account found for phone number {reservation.phone_number}. "
+                        f"User needs to link via /start command or Telegram link in email."
                     )
-                    if found_tg_chat_id:
-                        # Update the guest record with the found tg_chat_id
-                        guest_repo = GuestRepository(session)
-                        try:
-                            await guest_repo.update_tg_chat_id(
-                                reservation.guest_id, found_tg_chat_id
-                            )
-                            # Refresh the reservation's guest relationship
-                            await session.refresh(reservation.guest)
-                            logger.info(
-                                f"Linked guest {reservation.guest_id} to tg_chat_id {found_tg_chat_id} "
-                                f"via phone number lookup for reservation {reservation_id}"
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to update guest {reservation.guest_id} with tg_chat_id {found_tg_chat_id}: {e}"
-                            )
-                            # Continue anyway - we can still try to send notification
-                            # by temporarily setting the tg_chat_id (but this won't persist)
-                            reservation.guest.tg_chat_id = found_tg_chat_id
-                    else:
-                        logger.info(
-                            f"No linked Telegram account found for phone number {reservation.phone_number}. "
-                            f"User needs to link via /start command or Telegram link in email."
-                        )
 
                 # Create services and send notification
                 email_service = EmailService()
@@ -132,7 +103,10 @@ def send_reservation_created_notification(self, reservation_id: str) -> None:
                     telegram_service=telegram_service,
                 )
 
-                await notification_service.send_reservation_created(reservation)
+                # Send notification using phone number identification (tg_chat_id if found)
+                await notification_service.send_reservation_created_by_phone(
+                    reservation, tg_chat_id
+                )
 
                 # Clean up telegram service client
                 await telegram_service.close()
@@ -170,13 +144,13 @@ def send_reservation_cancelled_notification(
         reservation_uuid = UUID(reservation_id)
         async with async_session_factory() as session:
             try:
-                # Load reservation with all relations including guest
+                # Load reservation with branch and table (no need for guest relationship)
                 reservation_repo = ReservationRepository(session)
                 reservation = await reservation_repo.get_by_id(
                     reservation_uuid,
                     load_branch=True,
                     load_table=True,
-                    load_guest=True,
+                    load_guest=False,  # Don't need guest relationship - identify by phone number
                 )
 
                 if reservation is None:
@@ -184,44 +158,30 @@ def send_reservation_cancelled_notification(
                     return
 
                 # Log reservation details for debugging
-                logger.info(f"Processing cancellation notification for reservation {reservation_id}: guest_id={reservation.guest_id if reservation.guest_id else 'None'}, "
-                           f"guest_loaded={reservation.guest is not None}, "
-                           f"tg_chat_id={reservation.guest.tg_chat_id if reservation.guest else 'N/A'}")
+                logger.info(
+                    f"Processing cancellation notification for reservation {reservation_id}: "
+                    f"phone_number={reservation.phone_number}, status={reservation.status.value}"
+                )
 
-                # If guest doesn't have tg_chat_id, try to find it by phone number
-                if reservation.guest and not reservation.guest.tg_chat_id:
+                # Find tg_chat_id by phone number (identify user by phone, not guest_id)
+                logger.info(
+                    f"Searching for tg_chat_id by phone number {reservation.phone_number} "
+                    f"for cancellation notification {reservation_id}"
+                )
+                tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
+                    reservation.phone_number
+                )
+
+                if tg_chat_id:
                     logger.info(
-                        f"Guest {reservation.guest_id} has no tg_chat_id, "
-                        f"searching for linked guest by phone number {reservation.phone_number}"
+                        f"Found tg_chat_id {tg_chat_id} for phone number {reservation.phone_number} "
+                        f"for cancellation notification {reservation_id}"
                     )
-                    found_tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
-                        reservation.phone_number
+                else:
+                    logger.info(
+                        f"No linked Telegram account found for phone number {reservation.phone_number}. "
+                        f"User needs to link via /start command or Telegram link in email."
                     )
-                    if found_tg_chat_id:
-                        # Update the guest record with the found tg_chat_id
-                        guest_repo = GuestRepository(session)
-                        try:
-                            await guest_repo.update_tg_chat_id(
-                                reservation.guest_id, found_tg_chat_id
-                            )
-                            # Refresh the reservation's guest relationship
-                            await session.refresh(reservation.guest)
-                            logger.info(
-                                f"Linked guest {reservation.guest_id} to tg_chat_id {found_tg_chat_id} "
-                                f"via phone number lookup for cancellation notification {reservation_id}"
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to update guest {reservation.guest_id} with tg_chat_id {found_tg_chat_id}: {e}"
-                            )
-                            # Continue anyway - we can still try to send notification
-                            # by temporarily setting the tg_chat_id (but this won't persist)
-                            reservation.guest.tg_chat_id = found_tg_chat_id
-                    else:
-                        logger.info(
-                            f"No linked Telegram account found for phone number {reservation.phone_number}. "
-                            f"User needs to link via /start command or Telegram link in email."
-                        )
 
                 # Create services and send notification
                 email_service = EmailService()
@@ -231,8 +191,9 @@ def send_reservation_cancelled_notification(
                     telegram_service=telegram_service,
                 )
 
-                await notification_service.send_reservation_cancelled(
-                    reservation, old_status
+                # Send notification using phone number identification (tg_chat_id if found)
+                await notification_service.send_reservation_cancelled_by_phone(
+                    reservation, old_status, tg_chat_id
                 )
 
                 # Clean up telegram service client
