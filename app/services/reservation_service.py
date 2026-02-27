@@ -166,8 +166,20 @@ class ReservationService:
 
             # Enqueue notification task via Celery (non-blocking)
             # Lazy import to avoid circular dependency
+            from app.core.logging import get_logger
+            logger = get_logger(__name__)
             from app.tasks.notifications import send_reservation_created_notification
-            send_reservation_created_notification.delay(str(reservation.id))
+            try:
+                task_result = send_reservation_created_notification.delay(str(reservation.id))
+                logger.info(
+                    f"Enqueued notification task for reservation {reservation.id}: "
+                    f"task_id={task_result.id}, phone_number={reservation.phone_number}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to enqueue notification task for reservation {reservation.id}: {e}",
+                    exc_info=True,
+                )
 
             return reservation_with_relations
         except IntegrityError:

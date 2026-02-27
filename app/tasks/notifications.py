@@ -52,6 +52,8 @@ def send_reservation_created_notification(self, reservation_id: str) -> None:
     Args:
         reservation_id: Reservation UUID as string
     """
+    logger.info(f"Celery task send_reservation_created_notification started for reservation {reservation_id}")
+    
     async def _send_notification() -> None:
         reservation_uuid = UUID(reservation_id)
         async with async_session_factory() as session:
