@@ -58,9 +58,11 @@ class NotificationService:
                 # Create a temporary guest-like object for Telegram service
                 # (Telegram service expects reservation.guest.tg_chat_id)
                 from types import SimpleNamespace
-                original_guest = getattr(reservation, 'guest', None)
+
+                # IMPORTANT: don't touch reservation.guest before we override it,
+                # to avoid triggering lazy-loading in an async context.
                 reservation.guest = SimpleNamespace(tg_chat_id=tg_chat_id)
-                
+
                 try:
                     await self._telegram_service.send_reservation_confirmation(reservation)
                     logger.info(
@@ -68,8 +70,11 @@ class NotificationService:
                         f"to chat_id {tg_chat_id}"
                     )
                 finally:
-                    # Restore original guest if it existed
-                    reservation.guest = original_guest
+                    # Remove the temporary guest object to avoid leaving inconsistent state.
+                    # We don't attempt to restore the original relationship to prevent
+                    # accidental lazy-loading on async sessions.
+                    if hasattr(reservation, "__dict__") and "guest" in reservation.__dict__:
+                        del reservation.__dict__["guest"]
             except Exception as e:
                 logger.error(
                     f"Failed to send reservation creation Telegram notification for reservation {reservation.id}: {e}",
