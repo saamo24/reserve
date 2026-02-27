@@ -26,10 +26,19 @@ class NotificationService:
         Args:
             reservation: Reservation instance with relations loaded (branch, table, guest)
         """
+        logger.info(
+            f"Processing reservation creation notification for reservation {reservation.id}: "
+            f"status={reservation.status.value}, guest_id={reservation.guest_id}, "
+            f"guest_loaded={reservation.guest is not None}, "
+            f"tg_chat_id={reservation.guest.tg_chat_id if reservation.guest else 'N/A'}"
+        )
+        
         # Send email if email exists
         if reservation.email:
             try:
+                logger.info(f"Sending email notification for reservation {reservation.id} to {reservation.email}")
                 await self._email_service.send_reservation_confirmation(reservation)
+                logger.info(f"Email notification sent successfully for reservation {reservation.id}")
             except Exception as e:
                 logger.error(
                     f"Failed to send reservation creation email for reservation {reservation.id}: {e}",
@@ -38,13 +47,27 @@ class NotificationService:
 
         # Send Telegram notification if guest has tg_chat_id
         if not reservation.guest:
-            logger.info(f"Skipping Telegram notification for reservation {reservation.id}: guest not loaded")
+            logger.warning(
+                f"Skipping Telegram notification for reservation {reservation.id}: guest not loaded. "
+                f"guest_id={reservation.guest_id}"
+            )
         elif not reservation.guest.tg_chat_id:
-            logger.info(f"Skipping Telegram notification for reservation {reservation.id}: guest_id={reservation.guest_id} has no tg_chat_id")
+            logger.info(
+                f"Skipping Telegram notification for reservation {reservation.id}: "
+                f"guest_id={reservation.guest_id} has no tg_chat_id. "
+                f"User needs to link account via /start command or Telegram link in email."
+            )
         else:
             try:
-                logger.info(f"Sending Telegram notification for reservation {reservation.id} to chat_id {reservation.guest.tg_chat_id}")
+                logger.info(
+                    f"Sending Telegram notification for reservation {reservation.id} "
+                    f"to chat_id {reservation.guest.tg_chat_id} (guest_id={reservation.guest_id})"
+                )
                 await self._telegram_service.send_reservation_confirmation(reservation)
+                logger.info(
+                    f"Telegram notification sent successfully for reservation {reservation.id} "
+                    f"to chat_id {reservation.guest.tg_chat_id}"
+                )
             except Exception as e:
                 logger.error(
                     f"Failed to send reservation creation Telegram notification for reservation {reservation.id}: {e}",

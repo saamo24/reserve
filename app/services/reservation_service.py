@@ -157,9 +157,9 @@ class ReservationService:
             await self._caching.invalidate_slots(body.branch_id, body.reservation_date)
             await self._caching.invalidate_tables(body.branch_id)
 
-            # Reload reservation with relations for notifications
+            # Reload reservation with relations for notifications (including guest for tg_chat_id)
             reservation_with_relations = await self._reservation_repo.get_by_id(
-                reservation.id, load_branch=True, load_table=True
+                reservation.id, load_branch=True, load_table=True, load_guest=True
             )
             if reservation_with_relations is None:
                 reservation_with_relations = reservation

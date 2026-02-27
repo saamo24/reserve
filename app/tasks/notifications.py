@@ -75,6 +75,20 @@ def send_reservation_created_notification(self, reservation_id: str) -> None:
                            f"guest_loaded={reservation.guest is not None}, "
                            f"tg_chat_id={reservation.guest.tg_chat_id if reservation.guest else 'N/A'}")
 
+                # Refresh guest relationship to ensure we have the latest tg_chat_id
+                # This is important because the guest might have been linked to Telegram after reservation creation
+                if reservation.guest:
+                    try:
+                        await session.refresh(reservation.guest)
+                        logger.info(
+                            f"Refreshed guest relationship for reservation {reservation_id}: "
+                            f"guest_id={reservation.guest_id}, tg_chat_id={reservation.guest.tg_chat_id}"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to refresh guest relationship for reservation {reservation_id}: {e}"
+                        )
+
                 # If guest doesn't have tg_chat_id, try to find it by phone number
                 if reservation.guest and not reservation.guest.tg_chat_id:
                     logger.info(
