@@ -1,7 +1,7 @@
 """Unified notification service for sending notifications via multiple channels."""
 
 from app.core.logging import get_logger
-from app.models.reservation import Reservation
+from app.models.reservation import Reservation, ReservationStatus
 from app.services.email_service import EmailService
 from app.services.tg_service import TelegramService
 
@@ -55,26 +55,62 @@ class NotificationService:
                     f"Sending Telegram notification for reservation {reservation.id} "
                     f"to chat_id {tg_chat_id} (identified by phone_number={reservation.phone_number})"
                 )
-                # Create a temporary guest-like object for Telegram service
-                # (Telegram service expects reservation.guest.tg_chat_id)
-                from types import SimpleNamespace
 
-                # IMPORTANT: don't touch reservation.guest before we override it,
-                # to avoid triggering lazy-loading in an async context.
-                reservation.guest = SimpleNamespace(tg_chat_id=tg_chat_id)
-
-                try:
-                    await self._telegram_service.send_reservation_confirmation(reservation)
-                    logger.info(
-                        f"Telegram notification sent successfully for reservation {reservation.id} "
-                        f"to chat_id {tg_chat_id}"
+                # For PENDING reservations, send confirmation request with buttons
+                if reservation.status == ReservationStatus.PENDING:
+                    keyboard = {
+                        "inline_keyboard": [
+                            [
+                                {
+                                    "text": "✅ Confirm",
+                                    "callback_data": f"confirm:{reservation.id}",
+                                },
+                                {
+                                    "text": "❌ Cancel",
+                                    "callback_data": f"cancel:{reservation.id}",
+                                },
+                            ]
+                        ]
+                    }
+                    message = self._telegram_service._format_reservation_confirmation_request(
+                        reservation
                     )
-                finally:
-                    # Remove the temporary guest object to avoid leaving inconsistent state.
-                    # We don't attempt to restore the original relationship to prevent
-                    # accidental lazy-loading on async sessions.
-                    if hasattr(reservation, "__dict__") and "guest" in reservation.__dict__:
-                        del reservation.__dict__["guest"]
+                    await self._telegram_service.send_message(
+                        tg_chat_id,
+                        message,
+                        reply_markup=keyboard,
+                    )
+                # For CONFIRMED reservations, send confirmation + QR (if any)
+                elif reservation.status == ReservationStatus.CONFIRMED:
+                    message = self._telegram_service._format_reservation_confirmation(reservation)
+                    await self._telegram_service.send_message(tg_chat_id, message)
+                    if reservation.qr_code_base64:
+                        await self._telegram_service.send_photo(
+                            tg_chat_id,
+                            reservation.qr_code_base64,
+                            caption="QR code for your reservation",
+                        )
+                # For CANCELLED reservations, send cancellation message
+                elif reservation.status == ReservationStatus.CANCELLED:
+                    message = self._telegram_service._format_reservation_cancellation(
+                        reservation
+                    )
+                    await self._telegram_service.send_message(tg_chat_id, message)
+                # For other statuses (e.g., COMPLETED), behave like CONFIRMED
+                else:
+                    message = self._telegram_service._format_reservation_confirmation(reservation)
+                    await self._telegram_service.send_message(tg_chat_id, message)
+                    if reservation.qr_code_base64:
+                        await self._telegram_service.send_photo(
+                            tg_chat_id,
+                            reservation.qr_code_base64,
+                            caption="QR code for your reservation",
+                        )
+
+                logger.info(
+                    f"Telegram notification sent successfully for reservation {reservation.id} "
+                    f"to chat_id {tg_chat_id}"
+                )
             except Exception as e:
                 logger.error(
                     f"Failed to send reservation creation Telegram notification for reservation {reservation.id}: {e}",
