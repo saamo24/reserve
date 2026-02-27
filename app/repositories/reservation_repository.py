@@ -205,8 +205,14 @@ class ReservationRepository(AsyncRepository[Reservation]):
         Returns:
             Most recent reservation with the given phone number, or None if not found
         """
+        from sqlalchemy import func
+        
         # Normalize phone number: remove spaces, dashes, parentheses, keep + and digits
+        # Also normalize to handle optional leading + sign
         normalized_search = phone_number.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').strip()
+        # Try with and without leading + for comparison
+        normalized_search_with_plus = normalized_search if normalized_search.startswith('+') else f'+{normalized_search}'
+        normalized_search_without_plus = normalized_search.lstrip('+')
         
         # Try exact match first
         q = (
@@ -224,26 +230,63 @@ class ReservationRepository(AsyncRepository[Reservation]):
         result = await self._session.execute(q)
         reservation = result.scalar_one_or_none()
         
-        # If not found with exact match, try normalized comparison
+        # If not found with exact match, try normalized comparison using database functions
         if reservation is None:
-            # Get all reservations and compare normalized phone numbers
-            all_q = select(Reservation).order_by(Reservation.created_at.desc())
-            all_result = await self._session.execute(all_q)
-            all_reservations = all_result.scalars().all()
+            # Use PostgreSQL REPLACE function to normalize phone numbers in the database
+            # Normalize: remove spaces, dashes, parentheses
+            normalized_db_phone = func.replace(
+                func.replace(
+                    func.replace(
+                        func.replace(Reservation.phone_number, ' ', ''),
+                        '-', ''
+                    ),
+                    '(', ''
+                ),
+                ')', ''
+            )
             
-            for res in all_reservations:
-                normalized_db = res.phone_number.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').strip()
-                if normalized_db == normalized_search:
-                    # Reload with relationships if needed
-                    if load_branch or load_table or load_guest:
-                        return await self.get_by_id(res.id, load_branch=load_branch, load_table=load_table, load_guest=load_guest)
-                    return res
+            # Try matching with the normalized search (with +)
+            q = (
+                select(Reservation)
+                .where(normalized_db_phone == normalized_search)
+                .order_by(Reservation.created_at.desc())
+                .limit(1)
+            )
+            if load_branch:
+                q = q.options(selectinload(Reservation.branch))
+            if load_table:
+                q = q.options(selectinload(Reservation.table))
+            if load_guest:
+                q = q.options(selectinload(Reservation.guest))
+            result = await self._session.execute(q)
+            reservation = result.scalar_one_or_none()
+            
+            # If still not found, try matching without leading + (in case DB has + but search doesn't, or vice versa)
+            if reservation is None:
+                # Remove leading + from both sides for comparison
+                normalized_db_phone_no_plus = func.ltrim(normalized_db_phone, '+')
+                
+                q = (
+                    select(Reservation)
+                    .where(normalized_db_phone_no_plus == normalized_search_without_plus)
+                    .order_by(Reservation.created_at.desc())
+                    .limit(1)
+                )
+                if load_branch:
+                    q = q.options(selectinload(Reservation.branch))
+                if load_table:
+                    q = q.options(selectinload(Reservation.table))
+                if load_guest:
+                    q = q.options(selectinload(Reservation.guest))
+                result = await self._session.execute(q)
+                reservation = result.scalar_one_or_none()
         
         return reservation
 
     async def find_tg_chat_id_by_phone_number(self, phone_number: str) -> int | None:
         """
         Find tg_chat_id by searching reservations with the same phone number.
+        Uses normalized phone number comparison for flexible matching.
         
         Searches for all reservations with the given phone number, finds their guests,
         and returns the first non-null tg_chat_id found.
@@ -254,7 +297,17 @@ class ReservationRepository(AsyncRepository[Reservation]):
         Returns:
             Telegram chat ID if found, None otherwise
         """
-        # Get distinct guest_ids for reservations with this phone number
+        from sqlalchemy import func
+        from app.models.guest import Guest
+        from app.core.logging import get_logger
+        logger = get_logger(__name__)
+        
+        # Normalize phone number: remove spaces, dashes, parentheses, keep + and digits
+        # Also normalize to handle optional leading + sign
+        normalized_search = phone_number.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').strip()
+        normalized_search_without_plus = normalized_search.lstrip('+')
+        
+        # Try exact match first
         q = (
             select(Reservation.guest_id)
             .where(Reservation.phone_number == phone_number)
@@ -263,14 +316,51 @@ class ReservationRepository(AsyncRepository[Reservation]):
         result = await self._session.execute(q)
         guest_ids = [row[0] for row in result.all()]
         
+        # If not found with exact match, try normalized comparison using database functions
         if not guest_ids:
+            # Use PostgreSQL REPLACE function to normalize phone numbers in the database
+            # Normalize: remove spaces, dashes, parentheses
+            normalized_db_phone = func.replace(
+                func.replace(
+                    func.replace(
+                        func.replace(Reservation.phone_number, ' ', ''),
+                        '-', ''
+                    ),
+                    '(', ''
+                ),
+                ')', ''
+            )
+            
+            # Try matching with the normalized search (with +)
+            q = (
+                select(Reservation.guest_id)
+                .where(normalized_db_phone == normalized_search)
+                .distinct()
+            )
+            result = await self._session.execute(q)
+            guest_ids = [row[0] for row in result.all()]
+            
+            # If still not found, try matching without leading + (in case DB has + but search doesn't, or vice versa)
+            if not guest_ids:
+                # Remove leading + from both sides for comparison
+                normalized_db_phone_no_plus = func.ltrim(normalized_db_phone, '+')
+                
+                q = (
+                    select(Reservation.guest_id)
+                    .where(normalized_db_phone_no_plus == normalized_search_without_plus)
+                    .distinct()
+                )
+                result = await self._session.execute(q)
+                guest_ids = [row[0] for row in result.all()]
+        
+        if not guest_ids:
+            logger.debug(
+                f"No reservations found for phone number {phone_number} "
+                f"(normalized: {normalized_search})"
+            )
             return None
         
         # Load guests and find one with tg_chat_id
-        from app.models.guest import Guest
-        from app.core.logging import get_logger
-        logger = get_logger(__name__)
-        
         guest_q = select(Guest).where(
             Guest.id.in_(guest_ids),
             Guest.tg_chat_id.isnot(None)
@@ -281,11 +371,13 @@ class ReservationRepository(AsyncRepository[Reservation]):
         if guest:
             logger.info(
                 f"Found tg_chat_id {guest.tg_chat_id} for phone number {phone_number} "
-                f"via guest {guest.id} (searched {len(guest_ids)} guest_ids)"
+                f"(normalized: {normalized_search}) via guest {guest.id} "
+                f"(searched {len(guest_ids)} guest_ids)"
             )
         else:
             logger.debug(
                 f"No tg_chat_id found for phone number {phone_number} "
+                f"(normalized: {normalized_search}) "
                 f"(searched {len(guest_ids)} guest_ids, none have tg_chat_id)"
             )
         

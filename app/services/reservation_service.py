@@ -164,22 +164,76 @@ class ReservationService:
             if reservation_with_relations is None:
                 reservation_with_relations = reservation
 
-            # Enqueue notification task via Celery (non-blocking)
-            # Lazy import to avoid circular dependency
+            # Send Telegram notification immediately using phone number identification
+            # This ensures notifications are sent even if Celery is not available
             from app.core.logging import get_logger
             logger = get_logger(__name__)
-            from app.tasks.notifications import send_reservation_created_notification
-            try:
-                task_result = send_reservation_created_notification.delay(str(reservation.id))
+            
+            # Find tg_chat_id by phone number
+            tg_chat_id = await self._reservation_repo.find_tg_chat_id_by_phone_number(
+                reservation_with_relations.phone_number
+            )
+            
+            if tg_chat_id:
+                try:
+                    from app.services.tg_service import TelegramService
+                    from app.services.email_service import EmailService
+                    from app.services.notification_service import NotificationService
+                    
+                    telegram_service = TelegramService()
+                    email_service = EmailService()
+                    notification_service = NotificationService(
+                        email_service=email_service,
+                        telegram_service=telegram_service,
+                    )
+                    
+                    logger.info(
+                        f"Sending notification immediately for reservation {reservation.id}: "
+                        f"phone_number={reservation_with_relations.phone_number}, tg_chat_id={tg_chat_id}"
+                    )
+                    await notification_service.send_reservation_created_by_phone(
+                        reservation_with_relations, tg_chat_id
+                    )
+                    await telegram_service.close()
+                    logger.info(
+                        f"Notification sent successfully for reservation {reservation.id}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send notification for reservation {reservation.id}: {e}",
+                        exc_info=True,
+                    )
+                    # Also try enqueuing Celery task as fallback
+                    try:
+                        from app.tasks.notifications import send_reservation_created_notification
+                        task_result = send_reservation_created_notification.delay(str(reservation.id))
+                        logger.info(
+                            f"Enqueued Celery task as fallback for reservation {reservation.id}: "
+                            f"task_id={task_result.id}"
+                        )
+                    except Exception as celery_error:
+                        logger.error(
+                            f"Failed to enqueue Celery task for reservation {reservation.id}: {celery_error}",
+                            exc_info=True,
+                        )
+            else:
                 logger.info(
-                    f"Enqueued notification task for reservation {reservation.id}: "
-                    f"task_id={task_result.id}, phone_number={reservation.phone_number}"
+                    f"No tg_chat_id found for phone_number={reservation_with_relations.phone_number} "
+                    f"for reservation {reservation.id}. User needs to link via /start command."
                 )
-            except Exception as e:
-                logger.error(
-                    f"Failed to enqueue notification task for reservation {reservation.id}: {e}",
-                    exc_info=True,
-                )
+                # Still enqueue Celery task for email notifications
+                try:
+                    from app.tasks.notifications import send_reservation_created_notification
+                    task_result = send_reservation_created_notification.delay(str(reservation.id))
+                    logger.info(
+                        f"Enqueued notification task for reservation {reservation.id}: "
+                        f"task_id={task_result.id}, phone_number={reservation_with_relations.phone_number}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to enqueue notification task for reservation {reservation.id}: {e}",
+                        exc_info=True,
+                    )
 
             return reservation_with_relations
         except IntegrityError:

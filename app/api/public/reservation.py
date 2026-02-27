@@ -85,19 +85,41 @@ async def attach_reservation_to_guest(
         raise HTTPException(status_code=404, detail="Reservation not found or invalid code")
     # Only send Telegram confirmation if the reservation was newly attached (guest_id changed)
     # This prevents duplicate notifications when viewing the same reservation multiple times
-    if guest_id_changed and reservation.guest and reservation.guest.tg_chat_id:
-        telegram_service = TelegramService()
-        try:
-            await telegram_service.send_reservation_confirmation(reservation)
-        except Exception as e:
-            logger.warning(
-                "Failed to send Telegram confirmation after attach for reservation %s: %s",
-                reservation_id,
-                e,
-                exc_info=True,
+    # Use phone number identification instead of guest relationship
+    if guest_id_changed:
+        reservation_repo = ReservationRepository(db)
+        tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
+            reservation.phone_number
+        )
+        if tg_chat_id:
+            telegram_service = TelegramService()
+            try:
+                # Create temporary guest object for Telegram service compatibility
+                from types import SimpleNamespace
+                original_guest = getattr(reservation, 'guest', None)
+                reservation.guest = SimpleNamespace(tg_chat_id=tg_chat_id)
+                try:
+                    await telegram_service.send_reservation_confirmation(reservation)
+                    logger.info(
+                        f"Sent Telegram notification after attach for reservation {reservation_id} "
+                        f"to chat_id {tg_chat_id} (phone_number={reservation.phone_number})"
+                    )
+                finally:
+                    reservation.guest = original_guest
+            except Exception as e:
+                logger.warning(
+                    "Failed to send Telegram confirmation after attach for reservation %s: %s",
+                    reservation_id,
+                    e,
+                    exc_info=True,
+                )
+            finally:
+                await telegram_service.close()
+        else:
+            logger.info(
+                f"No tg_chat_id found for phone_number={reservation.phone_number} "
+                f"for reservation {reservation_id} after attach"
             )
-        finally:
-            await telegram_service.close()
     return reservation
 
 
@@ -117,19 +139,41 @@ async def dev_attach_reservation_to_guest(
         raise HTTPException(status_code=404, detail="Reservation not found")
     # Only send Telegram confirmation if the reservation was newly attached (guest_id changed)
     # This prevents duplicate notifications when viewing the same reservation multiple times
-    if guest_id_changed and reservation.guest and reservation.guest.tg_chat_id:
-        telegram_service = TelegramService()
-        try:
-            await telegram_service.send_reservation_confirmation(reservation)
-        except Exception as e:
-            logger.warning(
-                "Failed to send Telegram confirmation after dev attach for reservation %s: %s",
-                reservation_id,
-                e,
-                exc_info=True,
+    # Use phone number identification instead of guest relationship
+    if guest_id_changed:
+        reservation_repo = ReservationRepository(db)
+        tg_chat_id = await reservation_repo.find_tg_chat_id_by_phone_number(
+            reservation.phone_number
+        )
+        if tg_chat_id:
+            telegram_service = TelegramService()
+            try:
+                # Create temporary guest object for Telegram service compatibility
+                from types import SimpleNamespace
+                original_guest = getattr(reservation, 'guest', None)
+                reservation.guest = SimpleNamespace(tg_chat_id=tg_chat_id)
+                try:
+                    await telegram_service.send_reservation_confirmation(reservation)
+                    logger.info(
+                        f"Sent Telegram notification after dev attach for reservation {reservation_id} "
+                        f"to chat_id {tg_chat_id} (phone_number={reservation.phone_number})"
+                    )
+                finally:
+                    reservation.guest = original_guest
+            except Exception as e:
+                logger.warning(
+                    "Failed to send Telegram confirmation after dev attach for reservation %s: %s",
+                    reservation_id,
+                    e,
+                    exc_info=True,
+                )
+            finally:
+                await telegram_service.close()
+        else:
+            logger.info(
+                f"No tg_chat_id found for phone_number={reservation.phone_number} "
+                f"for reservation {reservation_id} after dev attach"
             )
-        finally:
-            await telegram_service.close()
     return reservation
 
 

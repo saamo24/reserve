@@ -272,17 +272,34 @@ async def _handle_start_command(
             cleaned_code = reservation_code.replace(' ', '').replace('-', '')
             is_phone = reservation_code.startswith('+') or cleaned_code.isdigit()
             
-            logger.info(f"Reservation not found by code '{reservation_code}', is_phone={is_phone}, trying phone lookup...")
+            logger.info(
+                f"Reservation not found by code '{reservation_code}', "
+                f"is_phone={is_phone}, cleaned_code='{cleaned_code}', trying phone lookup..."
+            )
             
             if is_phone:
-                reservation = await reservation_repo.get_most_recent_by_phone_number(
-                    reservation_code,
-                    load_guest=True,
-                )
-                if reservation:
-                    logger.info(f"Found reservation by phone number: {reservation_code}, reservation_id={reservation.id}")
-                else:
-                    logger.warning(f"No reservation found for phone number: {reservation_code}")
+                try:
+                    reservation = await reservation_repo.get_most_recent_by_phone_number(
+                        reservation_code,
+                        load_guest=True,
+                    )
+                    if reservation:
+                        logger.info(
+                            f"Found reservation by phone number '{reservation_code}': "
+                            f"reservation_id={reservation.id}, "
+                            f"stored_phone_number='{reservation.phone_number}', "
+                            f"status={reservation.status.value}"
+                        )
+                    else:
+                        logger.warning(
+                            f"No reservation found for phone number '{reservation_code}'. "
+                            f"User may need to create a reservation first or use a reservation code."
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error looking up reservation by phone number '{reservation_code}': {e}",
+                        exc_info=True,
+                    )
 
         if reservation is None:
             await telegram_service.send_message(
