@@ -15,13 +15,8 @@ class Guest(Base, TimestampMixin):
 
     __table_args__ = (
         Index("ix_guests_tg_chat_id", "tg_chat_id"),
-        # Partial unique index: tg_chat_id must be unique when not null
-        Index(
-            "uq_guests_tg_chat_id",
-            "tg_chat_id",
-            unique=True,
-            postgresql_where=text("tg_chat_id IS NOT NULL"),
-        ),
+        # Note: tg_chat_id is no longer unique to allow multiple guests per Telegram account
+        # Users are identified by phone number from reservations
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=__import__("uuid").uuid4)

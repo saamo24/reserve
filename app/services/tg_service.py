@@ -283,8 +283,23 @@ Your reservation for {date_str} at {branch_name} has been cancelled."""
                 reply_markup=keyboard,
             )
             # QR code is sent only after user confirms (in webhook), not with PENDING request
+        elif reservation.status == ReservationStatus.CONFIRMED:
+            # For CONFIRMED reservations, send confirmation message without buttons
+            # Preserve CONFIRMED status - don't change it to PENDING
+            message = self._format_reservation_confirmation(reservation)
+            await self.send_message(reservation.guest.tg_chat_id, message)
+            if reservation.qr_code_base64:
+                await self.send_photo(
+                    reservation.guest.tg_chat_id,
+                    reservation.qr_code_base64,
+                    caption="QR code for your reservation",
+                )
+        elif reservation.status == ReservationStatus.CANCELLED:
+            # For CANCELLED reservations, send cancellation message
+            message = self._format_reservation_cancellation(reservation)
+            await self.send_message(reservation.guest.tg_chat_id, message)
         else:
-            # For already confirmed reservations, send confirmation message without buttons
+            # For other statuses (e.g., COMPLETED), send confirmation message
             message = self._format_reservation_confirmation(reservation)
             await self.send_message(reservation.guest.tg_chat_id, message)
             if reservation.qr_code_base64:

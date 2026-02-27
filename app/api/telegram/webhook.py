@@ -100,12 +100,15 @@ async def _handle_confirm_callback(
             return
 
         # Auto-link guest to Telegram chat_id if not already linked
+        # This uses phone number from reservation to identify the correct guest
         if reservation.guest and reservation.guest.tg_chat_id != chat_id:
             guest_repo = GuestRepository(db)
             try:
                 await guest_repo.update_tg_chat_id(reservation.guest_id, chat_id)
                 logger.info(f"Linked guest {reservation.guest_id} to Telegram chat_id {chat_id}")
             except Exception as e:
+                # Rollback session on error to prevent PendingRollbackError
+                await db.rollback()
                 logger.warning(f"Failed to link guest {reservation.guest_id} to chat_id {chat_id}: {e}")
 
         # Send confirmation message
@@ -137,6 +140,11 @@ async def _handle_confirm_callback(
         )
         await telegram_service.close()
     except Exception as e:
+        # Rollback session on any error
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         logger.error(f"Error handling confirm callback: {e}", exc_info=True)
         await telegram_service.answer_callback_query(
             callback_query_id,
@@ -183,12 +191,15 @@ async def _handle_cancel_callback(
             return
 
         # Auto-link guest to Telegram chat_id if not already linked
+        # This uses phone number from reservation to identify the correct guest
         if reservation.guest and reservation.guest.tg_chat_id != chat_id:
             guest_repo = GuestRepository(db)
             try:
                 await guest_repo.update_tg_chat_id(reservation.guest_id, chat_id)
                 logger.info(f"Linked guest {reservation.guest_id} to Telegram chat_id {chat_id}")
             except Exception as e:
+                # Rollback session on error to prevent PendingRollbackError
+                await db.rollback()
                 logger.warning(f"Failed to link guest {reservation.guest_id} to chat_id {chat_id}: {e}")
 
         # Send cancellation message
@@ -212,6 +223,11 @@ async def _handle_cancel_callback(
         )
         await telegram_service.close()
     except Exception as e:
+        # Rollback session on any error
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         logger.error(f"Error handling cancel callback: {e}", exc_info=True)
         await telegram_service.answer_callback_query(
             callback_query_id,
@@ -306,16 +322,15 @@ async def _handle_start_command(
                     "✅ Account linked successfully! You'll now receive reservation updates here via Telegram."
                 )
                 logger.info(f"Linked guest {reservation.guest_id} to Telegram chat_id {chat_id} via /start command")
-                # Reload with branch/table for formatting; same as email: PENDING until user confirms/cancels in TG
+                # Reload with branch/table for formatting
                 reservation = await reservation_repo.get_by_id(
                     reservation.id, load_branch=True, load_table=True, load_guest=True
                 )
-                if reservation.status == ReservationStatus.CONFIRMED:
-                    reservation.status = ReservationStatus.PENDING
-                    await reservation_repo.update(reservation)
-                    await db.commit()
+                # Send reservation details based on current status (preserve status, don't change CONFIRMED to PENDING)
                 await telegram_service.send_reservation_confirmation(reservation)
         except Exception as e:
+            # Rollback session on any error to prevent PendingRollbackError
+            await db.rollback()
             await telegram_service.send_message(
                 chat_id,
                 "❌ An error occurred while linking your account. Please try again later."
@@ -326,6 +341,11 @@ async def _handle_start_command(
 
     except Exception as e:
         logger.error(f"Error handling /start command: {e}", exc_info=True)
+        # Rollback session on any error
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         try:
             await telegram_service.send_message(
                 chat_id,

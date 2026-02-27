@@ -237,19 +237,7 @@ class ReservationService:
         reservation = await self._reservation_repo.get_by_id(
             reservation_id, load_branch=True, load_table=True, load_guest=True
         )
-        # Same as email: when sending to Telegram, keep PENDING until user confirms/cancels in TG
-        if (
-            reservation
-            and reservation.guest
-            and reservation.guest.tg_chat_id
-            and reservation.status == ReservationStatus.CONFIRMED
-        ):
-            reservation.status = ReservationStatus.PENDING
-            await self._reservation_repo.update(reservation)
-            await self._session.commit()
-            reservation = await self._reservation_repo.get_by_id(
-                reservation_id, load_branch=True, load_table=True, load_guest=True
-            )
+        # Preserve reservation status - don't change CONFIRMED to PENDING
         return reservation
 
     async def attach_to_guest_by_id(
@@ -267,18 +255,7 @@ class ReservationService:
         reservation = await self._reservation_repo.get_by_id(
             reservation_id, load_branch=True, load_table=True, load_guest=True
         )
-        if (
-            reservation
-            and reservation.guest
-            and reservation.guest.tg_chat_id
-            and reservation.status == ReservationStatus.CONFIRMED
-        ):
-            reservation.status = ReservationStatus.PENDING
-            await self._reservation_repo.update(reservation)
-            await self._session.commit()
-            reservation = await self._reservation_repo.get_by_id(
-                reservation_id, load_branch=True, load_table=True, load_guest=True
-            )
+        # Preserve reservation status - don't change CONFIRMED to PENDING
         return reservation
 
     async def list_my_reservations(
