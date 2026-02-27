@@ -293,7 +293,7 @@ class ReservationService:
     ) -> tuple[Reservation | None, bool]:
         """
         Link a reservation to the current guest by proving ownership with id+code.
-        
+
         Returns:
             Tuple of (updated reservation or None, whether guest_id changed)
         """
@@ -302,11 +302,14 @@ class ReservationService:
         )
         if reservation is None:
             return None, False
-        
+
+        # Ensure the target guest exists to avoid FK violations when updating guest_id
+        await self._guest_repo.get_or_create(guest_id)
+
         # Check if guest_id is changing
         old_guest_id = reservation.guest_id
         guest_id_changed = old_guest_id != guest_id
-        
+
         reservation.guest_id = guest_id
         await self._reservation_repo.update(reservation)
         await self._session.commit()
@@ -321,7 +324,7 @@ class ReservationService:
     ) -> tuple[Reservation | None, bool]:
         """
         Link a reservation to the current guest by id only. For local dev only (no code check).
-        
+
         Returns:
             Tuple of (updated reservation or None, whether guest_id changed)
         """
@@ -330,11 +333,14 @@ class ReservationService:
         )
         if reservation is None:
             return None, False
-        
+
+        # Ensure the target guest exists to avoid FK violations when updating guest_id
+        await self._guest_repo.get_or_create(guest_id)
+
         # Check if guest_id is changing
         old_guest_id = reservation.guest_id
         guest_id_changed = old_guest_id != guest_id
-        
+
         reservation.guest_id = guest_id
         await self._reservation_repo.update(reservation)
         await self._session.commit()
