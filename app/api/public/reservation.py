@@ -80,11 +80,12 @@ async def attach_reservation_to_guest(
 ) -> ReservationResponsePublic:
     """Link a reservation to the current guest so it appears in My Reservations. Requires id+code."""
     service = _reservation_service(db, redis)
-    reservation = await service.attach_to_guest(reservation_id, code, guest_id)
+    reservation, guest_id_changed = await service.attach_to_guest(reservation_id, code, guest_id)
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found or invalid code")
-    # Send Telegram confirmation now that reservation is linked to a guest with tg_chat_id
-    if reservation.guest and reservation.guest.tg_chat_id:
+    # Only send Telegram confirmation if the reservation was newly attached (guest_id changed)
+    # This prevents duplicate notifications when viewing the same reservation multiple times
+    if guest_id_changed and reservation.guest and reservation.guest.tg_chat_id:
         telegram_service = TelegramService()
         try:
             await telegram_service.send_reservation_confirmation(reservation)
@@ -111,10 +112,12 @@ async def dev_attach_reservation_to_guest(
     if get_settings().app_env != "development":
         raise HTTPException(status_code=404, detail="Not found")
     service = _reservation_service(db, redis)
-    reservation = await service.attach_to_guest_by_id(reservation_id, guest_id)
+    reservation, guest_id_changed = await service.attach_to_guest_by_id(reservation_id, guest_id)
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
-    if reservation.guest and reservation.guest.tg_chat_id:
+    # Only send Telegram confirmation if the reservation was newly attached (guest_id changed)
+    # This prevents duplicate notifications when viewing the same reservation multiple times
+    if guest_id_changed and reservation.guest and reservation.guest.tg_chat_id:
         telegram_service = TelegramService()
         try:
             await telegram_service.send_reservation_confirmation(reservation)

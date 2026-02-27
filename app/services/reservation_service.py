@@ -224,13 +224,23 @@ class ReservationService:
 
     async def attach_to_guest(
         self, reservation_id: UUID, code: str, guest_id: UUID
-    ) -> Reservation | None:
-        """Link a reservation to the current guest by proving ownership with id+code. Returns updated reservation or None."""
+    ) -> tuple[Reservation | None, bool]:
+        """
+        Link a reservation to the current guest by proving ownership with id+code.
+        
+        Returns:
+            Tuple of (updated reservation or None, whether guest_id changed)
+        """
         reservation = await self._reservation_repo.get_by_id_and_code(
             reservation_id, code, load_branch=False, load_table=False
         )
         if reservation is None:
-            return None
+            return None, False
+        
+        # Check if guest_id is changing
+        old_guest_id = reservation.guest_id
+        guest_id_changed = old_guest_id != guest_id
+        
         reservation.guest_id = guest_id
         await self._reservation_repo.update(reservation)
         await self._session.commit()
@@ -238,17 +248,27 @@ class ReservationService:
             reservation_id, load_branch=True, load_table=True, load_guest=True
         )
         # Preserve reservation status - don't change CONFIRMED to PENDING
-        return reservation
+        return reservation, guest_id_changed
 
     async def attach_to_guest_by_id(
         self, reservation_id: UUID, guest_id: UUID
-    ) -> Reservation | None:
-        """Link a reservation to the current guest by id only. For local dev only (no code check)."""
+    ) -> tuple[Reservation | None, bool]:
+        """
+        Link a reservation to the current guest by id only. For local dev only (no code check).
+        
+        Returns:
+            Tuple of (updated reservation or None, whether guest_id changed)
+        """
         reservation = await self._reservation_repo.get_by_id(
             reservation_id, load_branch=False, load_table=False
         )
         if reservation is None:
-            return None
+            return None, False
+        
+        # Check if guest_id is changing
+        old_guest_id = reservation.guest_id
+        guest_id_changed = old_guest_id != guest_id
+        
         reservation.guest_id = guest_id
         await self._reservation_repo.update(reservation)
         await self._session.commit()
@@ -256,7 +276,7 @@ class ReservationService:
             reservation_id, load_branch=True, load_table=True, load_guest=True
         )
         # Preserve reservation status - don't change CONFIRMED to PENDING
-        return reservation
+        return reservation, guest_id_changed
 
     async def list_my_reservations(
         self, guest_id: UUID, skip: int = 0, limit: int = 50
